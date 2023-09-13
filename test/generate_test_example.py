@@ -1,6 +1,6 @@
 
 import numpy as np
-import scDensQP as scqp
+import scDensQP as scdqp
 
 mu1 = np.array([1,0])
 mu2 = np.array([0,1])
@@ -23,7 +23,7 @@ x2 = mu2 + sigma * rng.normal(size=(n, 2))
 
 x = np.vstack([x1, x2])
 
-w = scqp.estimate_weights_multisample(x, mu)
+w = scdqp.estimate_weights_multisample(x, mu)
 
 assert np.allclose(w.sum(axis=0), 1)
 

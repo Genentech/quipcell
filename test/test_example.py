@@ -4,7 +4,7 @@ import pytest
 import os
 
 import numpy as np
-import scDensQP as scqp
+import scDensQP as scdqp
 
 dirname = os.path.dirname(os.path.realpath(__file__))
 
@@ -24,6 +24,6 @@ def test_example():
         'test_example_mu.txt'
     ))
 
-    w2 = scqp.estimate_weights_multisample(x, mu)
+    w2 = scdqp.estimate_weights_multisample(x, mu)
 
     assert np.allclose(w, w2)
