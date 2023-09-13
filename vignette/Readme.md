@@ -34,3 +34,18 @@ python -m ipykernel install --name scdensqp
 
 (Note: May need to add --user flag to ipykernel install, depending on
 OS)
+
+
+Next, run
+```
+python preprocess.py
+```
+Which loads the full HLCA, and then performs some processing to make a
+smaller dataset that is easier to work with in memory.
+
+Note that loading the full HLCA takes a lot of memory. I was able to
+run the preprocessing script on my laptop when I closed all other
+applications, but swap did get a hit, and your mileage may vary.
+
+After running the preprocessing script, the dataset is much smaller,
+and the jupyter notebook should be runnable on most laptops.

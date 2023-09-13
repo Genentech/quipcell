@@ -1,47 +1,28 @@
+#!/usr/bin/env python
 
+import numpy as np
 import pandas as pd
+
 import anndata as ad
 import scanpy as sc
 
-# TODO Use logging.info() instead of print()
-print("Loading HLCA")
+import logging
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s %(message)s")
+
+logging.info("Loading HLCA")
 
 # Takes 17-18 GB RAM
 adata = ad.read_h5ad("data/hlca_orig.h5ad")
 
-# First, save the number of UMIs before filtering
-
-adata.obs['n_umi'] = adata.raw.X.sum(axis=1)
-
-# Select highly variable genes
-
-print("Selecting highly variable genes")
-
-sc.pp.highly_variable_genes(
-    adata,
-    batch_key='study'
-)
-
-# Revert to raw counts
-
-adata.X = adata.raw.X
-del adata.raw
-
-# save a smaller copy with just the highly variable genes
-
-print("Saving smaller copy of dataset")
-
-adata_hvgs = adata[:,adata.var['highly_variable']]
-adata_hvgs.write_h5ad("data/hlca_hvgs.h5ad")
-
 # Generate & save pseudobulks
 
-print("Generating pseudobulks")
+logging.info("Generating pseudobulks")
 
 onehot = pd.get_dummies(adata.obs['sample'], dtype=float, sparse=True)
 onehot_mat = onehot.sparse.to_coo().tocsr()
 
-pseudobulks = onehot_mat.T @ adata.X
+pseudobulks = onehot_mat.T @ adata.raw.X
 
 adata_pseudobulk = ad.AnnData(
     X=pseudobulks,
@@ -49,6 +30,37 @@ adata_pseudobulk = ad.AnnData(
     var=adata.var
 )
 
-print("Saving pseudobulks")
+logging.info("Saving pseudobulks")
 
 adata_pseudobulk.write_h5ad("data/pseudobulks.h5ad")
+
+# Select highly variable genes
+
+logging.info("Selecting highly variable genes")
+
+sc.pp.highly_variable_genes(
+    adata,
+    batch_key='study'
+)
+
+# Save number of UMIs before renormalizing/subsetting
+adata.obs['n_umi'] = adata.raw.X.sum(axis=1)
+
+logging.info("Renormalizing counts")
+
+# Delete the log-counts, switching to raw counts
+adata.X = adata.raw.X
+del adata.raw
+
+# Convert to counts per 5k
+target = 5000
+sc.pp.normalize_total(adata, target_sum=target)
+assert np.allclose(adata.X.sum(axis=1), target)
+adata.uns['normalize_total_target_sum'] = target
+
+# save a smaller copy with just the highly variable genes
+
+logging.info("Saving smaller copy of dataset")
+
+adata = adata[:,adata.var['highly_variable']]
+adata.write_h5ad("data/hlca_hvgs.h5ad")
