@@ -3,6 +3,7 @@ name = "scDensQP"
 version = "0.0.1"
 dependencies = [
     #"requests",
+    "numpy",
     "cvxpy",
     'importlib-metadata; python_version>="3.8"',
 ]
