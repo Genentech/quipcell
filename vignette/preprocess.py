@@ -34,6 +34,8 @@ logging.info("Saving pseudobulks")
 
 adata_pseudobulk.write_h5ad("data/pseudobulks.h5ad")
 
+# TODO Add study, subject_ID to adata_pseudobulk.obs
+
 # Select highly variable genes
 
 logging.info("Selecting highly variable genes")
