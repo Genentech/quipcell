@@ -8,33 +8,33 @@ import scipy.sparse
 logger = logging.getLogger(__name__)
 
 def estimate_weights_multisample(X, mu_multisample,
-                                 quad_form=True,
-                                 **solver_kwargs):
+                                 renormalize=True,
+                                 **kwargs):
     w_hat_multisample = []
-
-    kwargs = {"verbose": False}
-    kwargs.update(solver_kwargs)
 
     for i in range(mu_multisample.shape[0]):
         prob = estimate_weights(X, mu_multisample[i,:],
-                                quad_form=quad_form,
                                 **kwargs)
 
         w_hat, = prob.variables()
         w_hat = w_hat.value.copy()
 
-        norm = prob.value #float
-        status = prob.status #string
-        logger.info(f"i={i}, obj={norm}, {status}")
+        logger.info(f"i={i}, objective={prob.value}, {prob.status}")
 
         w_hat_multisample.append(w_hat)
 
     ret = np.array(w_hat_multisample).T
-    ret[ret < 0] = 0
-    ret = np.einsum("ij,j->ij", ret, 1.0 / ret.sum(axis=0))
+    if renormalize:
+        ret[ret < 0] = 0
+        ret = np.einsum("ij,j->ij", ret, 1.0 / ret.sum(axis=0))
+
     return ret
 
-def estimate_weights(X, mu, quad_form=True, **solver_kwargs):
+def estimate_weights(X, mu, quad_form=True, solve_kwargs=None):
+    if not solve_kwargs:
+        solve_kwargs = {}
+    solve_kwargs.setdefault("verbose", False)
+
     n = X.shape[0]
     z = np.zeros(n)
 
@@ -56,7 +56,7 @@ def estimate_weights(X, mu, quad_form=True, **solver_kwargs):
          cp.sum(w) == 1.0]
     )
 
-    res = prob.solve(**solver_kwargs)
+    res = prob.solve(**solve_kwargs)
     assert prob.variables()[0] is w
     assert prob.value is res
 
