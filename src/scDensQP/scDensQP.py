@@ -43,6 +43,13 @@ def estimate_weights(X, mu, quad_form=True, solve_kwargs=None):
     z = np.zeros(n)
 
     w = cp.Variable(n)
+
+    # Initialize  as uniform distribution
+    # NOTE: Unclear if CVXPY respects initialization for all solvers
+    # https://www.cvxpy.org/tutorial/advanced/index.html#warm-start
+    # https://stackoverflow.com/questions/52314581/initial-guess-warm-start-in-cvxpy-give-a-hint-of-the-solution
+    w.value = np.ones(n) / n
+
     Xt = X.T
 
     if quad_form:
