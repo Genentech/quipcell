@@ -19,6 +19,8 @@ def estimate_weights_multisample(X, mu_multisample,
         w_hat, = prob.variables()
         w_hat = w_hat.value.copy()
 
+        # Reference for problem statuses:
+        # https://www.cvxpy.org/tutorial/intro/index.html#other-problem-statuses
         logger.info(f"i={i}, objective={prob.value}, {prob.status}")
 
         w_hat_multisample.append(w_hat)
@@ -31,6 +33,8 @@ def estimate_weights_multisample(X, mu_multisample,
     return ret
 
 def estimate_weights(X, mu, quad_form=True, solve_kwargs=None):
+    # Reference for solver options:
+    # https://www.cvxpy.org/tutorial/advanced/index.html#setting-solver-options
     if not solve_kwargs:
         solve_kwargs = {}
     solve_kwargs.setdefault("verbose", False)

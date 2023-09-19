@@ -16,6 +16,9 @@
 # %%
 from collections import Counter
 
+import logging
+logging.basicConfig(level=logging.INFO)
+
 import numpy as np
 import pandas as pd
 
@@ -31,6 +34,7 @@ import scipy.sparse
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 import scDensQP as scdqp
+import cvxpy as cp
 
 # %%
 adata = ad.read_h5ad("data/hlca_hvgs.h5ad")
@@ -127,6 +131,7 @@ adata_pseudobulk.obs = df
 keep = adata_pseudobulk.obs['study'] == validation_study
 adata_pseudobulk = adata_pseudobulk[keep,:]
 
+
 # %%
 keep = adata.obs['cohort'] == 'reference'
 adata_ref = adata[keep,:]
@@ -149,21 +154,6 @@ df = pd.melt(df, id_vars=['UMAP1', 'UMAP2'],
 
 # %%
 (gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight")) +
-    gg.geom_point(size=.25, alpha=.5) +
-    gg.facet_wrap("~sample") +
-    gg.scale_color_cmap(trans=scales.log_trans(base=10)))
-
-# %%
-(gg.ggplot(df, gg.aes(x="weight")) +
-    gg.geom_histogram() +
-    gg.scale_x_log10())
-
-# %%
-df['weight_trunc'] = df['weight']
-df['weight_trunc'][df['weight'] < 1e-7] = 0
-
-# %%
-(gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight_trunc")) +
     gg.geom_point(size=.25, alpha=.5) +
     gg.facet_wrap("~sample") +
     gg.scale_color_cmap(trans=scales.log_trans(base=10)))
