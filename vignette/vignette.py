@@ -134,11 +134,13 @@ adata_pseudobulk = adata_pseudobulk[keep,:]
 
 # %%
 keep = adata.obs['cohort'] == 'reference'
+#keep = adata.obs['cohort'] != 'validation'
 adata_ref = adata[keep,:]
 res = scdqp.estimate_weights_multisample(adata_ref.obsm['X_lda'],
                                          adata_pseudobulk.obsm['X_lda'])
 
 # %%
+# Make a dataframe for plotting the weights on UMAP
 df = np.hstack(
     [adata_ref.obsm['X_umap'],
      res]
@@ -152,10 +154,102 @@ df = pd.DataFrame(
 df = pd.melt(df, id_vars=['UMAP1', 'UMAP2'],
              var_name='sample', value_name='weight')
 
+# set very small weights to 0 for plotting purposes
+weight_trunc = df['weight'].values.copy()
+weight_trunc[weight_trunc < 1e-9] = 0
+df['weight_trunc'] = weight_trunc
+
 # %%
 (gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight")) +
     gg.geom_point(size=.25, alpha=.5) +
     gg.facet_wrap("~sample") +
     gg.scale_color_cmap(trans=scales.log_trans(base=10)))
+
+# %%
+(gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight_trunc")) +
+    gg.geom_point(size=.25, alpha=.5) +
+    gg.facet_wrap("~sample") +
+    gg.scale_color_cmap(trans=scales.log_trans(base=10)))
+
+# %%
+
+# TODO Move this to preprocess.py
+
+adata.obs['ann_finest_1'] = adata.obs['ann_level_1']
+
+for i in range(2,6):
+    ann_finest = adata.obs[f'ann_level_{i}'].astype(str)
+    is_none = (ann_finest == 'None')
+    ann_finest[is_none] = adata.obs[f'ann_finest_{i-1}'][is_none]
+    adata.obs[f'ann_finest_{i}'] = ann_finest
+
+# %%
+assert (adata.obs['ann_finest_level'] == adata.obs['ann_finest_5']).all()
+
+# %%
+# TODO plot cell-level weights on UMAP
+# TODO plot accuracy of cell-level counts
+
+# %%
+# TODO Move this to preprocess.py
+df_frac_umi = []
+
+for i in range(1, 6):
+    df = adata.obs.rename(columns={f'ann_finest_{i}': 'celltype'})
+    df = (df[['sample', 'celltype', 'n_umi']]
+    .groupby(['sample', 'celltype'], observed=False)
+    .sum()
+    .reset_index())
+
+    denom = (df[['sample', 'n_umi']]
+             .groupby('sample', observed=False)
+             .sum()
+             .loc[df['sample']]['n_umi']
+             .values)
+
+    df['frac_umi'] = df['n_umi'] / denom
+    df['ann_level'] = f'lvl{i}'
+    df_frac_umi.append(df)
+
+df_frac_umi = pd.concat(df_frac_umi)
+df_frac_umi
+
+# %%
+# Make a dataframe for plotting the weights on UMAP
+df_est_frac_umi = []
+
+for i in range(1, 6):
+    df = pd.DataFrame(
+        res,
+        columns = adata_pseudobulk.obs.index,
+        index = adata_ref.obs.index
+    )
+
+    df['celltype'] = adata_ref.obs[f'ann_finest_{i}']
+
+    df = pd.melt(df, id_vars=['celltype'],
+                var_name='sample', value_name='weight')
+
+    df = df.groupby(['sample', 'celltype'], observed=False).sum()
+    df['ann_level'] = f'lvl{i}'
+    df_est_frac_umi.append(df)
+
+df_est_frac_umi = pd.concat(df_est_frac_umi).reset_index().set_index(['ann_level', 'sample', 'celltype'])
+df_est_frac_umi
+
+# %%
+df = df_frac_umi
+df = df[df['sample'].isin(adata_pseudobulk.obs.index)]
+df['est_frac'] = df_est_frac_umi.loc[zip(df['ann_level'], df['sample'], df['celltype'])].values
+df['sample'] = df['sample'].astype(str)
+df
+
+# %%
+(gg.ggplot(df.sample(frac=1), 
+           gg.aes(x="frac_umi", y="est_frac", color="ann_level", shape="sample")) +
+    gg.geom_point() +
+    gg.geom_abline(linetype='dashed') +
+    gg.scale_x_sqrt() + gg.scale_y_sqrt() +
+    gg.theme_bw(base_size=16))
 
 # %%
