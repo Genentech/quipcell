@@ -31,6 +31,8 @@ import scanpy as sc
 
 import scipy.sparse
 
+from sklearn.preprocessing import OneHotEncoder
+from sklearn import linear_model
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 import scDensQP as scdqp
@@ -42,6 +44,10 @@ adata = ad.read_h5ad("data/hlca_hvgs.h5ad")
 
 # %%
 adata
+
+# %%
+# TODO make this less ugly
+sc.pl.umap(adata, color='ann_finest_level', legend_loc='on data')
 
 # %%
 # X should be scaled but not log-transformed. Check that multiplying
@@ -187,10 +193,6 @@ for i in range(2,6):
 assert (adata.obs['ann_finest_level'] == adata.obs['ann_finest_5']).all()
 
 # %%
-# TODO plot cell-level weights on UMAP
-# TODO plot accuracy of cell-level counts
-
-# %%
 # TODO Move this to preprocess.py
 df_frac_umi = []
 
@@ -253,3 +255,140 @@ df
     gg.theme_bw(base_size=16))
 
 # %%
+enc = OneHotEncoder()
+
+# %%
+modmat = enc.fit_transform(adata_ref.obs['sample'].values.reshape(-1, 1))
+
+# %%
+X = np.hstack([adata_ref.obsm['X_lda'], np.asarray(modmat.todense())])
+
+# %%
+clf = linear_model.PoissonRegressor(fit_intercept=False, alpha=0, solver='newton-cholesky', verbose=1)
+y = adata_ref.obs['n_umi'].values
+clf.fit(X, y)
+
+# %%
+size_factors = np.exp(adata_ref.obsm['X_lda'] @ clf.coef_[:adata_ref.obsm['X_lda'].shape[1]])
+size_factors = size_factors / np.sum(size_factors)
+size_factors
+
+# %%
+df = pd.DataFrame(
+    adata_ref.obsm['X_umap'],
+    columns=['UMAP1','UMAP2']
+)
+
+df['size_factor'] = size_factors
+
+(gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="size_factor")) +
+    gg.geom_point(size=.5, alpha=.5) +
+    gg.scale_color_cmap(trans=scales.log_trans(base=10)))
+
+# %%
+res_reweight = np.einsum("ij,i->ij", res, 1/size_factors)
+res_reweight = np.einsum("ij,j->ij", res_reweight, 1/res_reweight.sum(axis=0))
+assert np.allclose(res_reweight.sum(axis=0), 1)
+
+# %%
+# Make a dataframe for plotting the weights on UMAP
+df = np.hstack(
+    [adata_ref.obsm['X_umap'],
+     res_reweight]
+)
+
+df = pd.DataFrame(
+    df,
+    columns = ['UMAP1', 'UMAP2'] + list(adata_pseudobulk.obs.index)
+)
+
+df = pd.melt(df, id_vars=['UMAP1', 'UMAP2'],
+             var_name='sample', value_name='weight')
+
+# set very small weights to 0 for plotting purposes
+weight_trunc = df['weight'].values.copy()
+weight_trunc[weight_trunc < 1e-9] = 0
+df['weight_trunc'] = weight_trunc
+
+# %%
+(gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight")) +
+    gg.geom_point(size=.25, alpha=.5) +
+    gg.facet_wrap("~sample") +
+    gg.scale_color_cmap(trans=scales.log_trans(base=10)))
+
+# %%
+(gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight_trunc")) +
+    gg.geom_point(size=.125, alpha=.5) +
+    gg.facet_wrap("~sample") +
+    gg.scale_color_cmap(trans=scales.log_trans(base=10)))
+
+# %%
+# TODO Move this to preprocess.py
+df_frac_cells = []
+
+for i in range(1, 6):
+    df = adata.obs.rename(columns={f'ann_finest_{i}': 'celltype'})
+    df = (df[['sample', 'celltype']]
+    .groupby(['sample', 'celltype'], observed=False)
+    .size()
+    .to_frame('n_cell')
+    .reset_index())
+
+    denom = (df[['sample', 'n_cell']]
+             .groupby('sample', observed=False)
+             .sum()
+             .loc[df['sample']]['n_cell']
+             .values)
+
+    df['frac_cells'] = df['n_cell'] / denom
+    df['ann_level'] = f'lvl{i}'
+    df_frac_cells.append(df)
+
+df_frac_cells = pd.concat(df_frac_cells)
+df_frac_cells
+
+# %%
+# Make a dataframe for plotting the weights on UMAP
+df_est_frac_cells = []
+
+for i in range(1, 6):
+    df = pd.DataFrame(
+        res_reweight,
+        columns = adata_pseudobulk.obs.index,
+        index = adata_ref.obs.index
+    )
+
+    df['celltype'] = adata_ref.obs[f'ann_finest_{i}']
+
+    df = pd.melt(df, id_vars=['celltype'],
+                var_name='sample', value_name='weight')
+
+    df = df.groupby(['sample', 'celltype'], observed=False).sum()
+    df['ann_level'] = f'lvl{i}'
+    df_est_frac_cells.append(df)
+
+df_est_frac_cells = pd.concat(df_est_frac_cells).reset_index().set_index(['ann_level', 'sample', 'celltype'])
+df_est_frac_cells
+
+# %%
+df = df_frac_cells
+df = df[df['sample'].isin(adata_pseudobulk.obs.index)]
+df['est_frac'] = df_est_frac_cells.loc[zip(df['ann_level'], df['sample'], df['celltype'])].values
+df['sample'] = df['sample'].astype(str)
+df
+
+# %%
+(gg.ggplot(df.sample(frac=1), 
+           gg.aes(x="frac_cells", y="est_frac", color="ann_level", shape="sample")) +
+    gg.geom_point() +
+    gg.geom_abline(linetype='dashed') +
+    gg.scale_x_sqrt() + gg.scale_y_sqrt() +
+    gg.theme_bw(base_size=16))
+
+# %%
+# TODO adjust x,y labels of sqrt scaled plots
+# TODO only show 1 umap weights plot
+# TODO move stuff to preprocess
+# TODO Add explanatory text (e.g. about the alveolar macrophages)
+# TODO Move poisson regression into package helper function
+# TODO Use seed for pandas row shuffling
