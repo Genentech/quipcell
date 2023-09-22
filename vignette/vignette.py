@@ -47,22 +47,22 @@ adata
 
 # %%
 # TODO make this less ugly
+# Or just delete it?
 sc.pl.umap(adata, color='ann_finest_level', legend_loc='on data')
 
 # %%
-# X should be scaled but not log-transformed. Check that multiplying
-# by normalization factors yields an integer.
-assert np.allclose(
-    0, np.modf((scipy.sparse.diags(adata.obs['n_umi'].values) * adata.X *
-                adata.uns['normalize_total_target_sum']).data)[0]
-)
+# Normalize
+normalize_sum = 1000
+adata.X = scipy.sparse.diags(normalize_sum / adata.obs['n_umi'].values) @ adata.X
 
-# TODO: Notebook would be clearer if adata just contained counts, and
-# we manually normalized by n_umi, rather than doing it in
-# preprocessing step
+# TODO Just use scanpy normalize_total() instead? Even tho it doesn't
+# account for the non-hvgs, it's probably fine, and would simplify exposition.
+# NOTE that the order of normalization of pseudobulks would also have to change.
 
 # %%
 sc.pp.pca(adata, n_comps=100)
+
+# TODO: Is PCA really necessary? Could we just use LDA directly on the counts?
 
 # %%
 # since the PCA is zero-centered, we need to save the gene-wise means
@@ -86,6 +86,9 @@ validation_study = 'Krasnow_2020'
 
 adata.obs['cohort'][adata.obs['study'] == validation_study] = 'validation'
 
+# TODO Simplify this by dropping the query cohort?
+# Just create an adata_ref object instead, and use that for everything (e.g. LDA)
+
 # %%
 Counter(adata.obs['cohort'])
 
@@ -106,7 +109,7 @@ adata_pseudobulk = ad.read_h5ad("data/pseudobulks.h5ad")
 
 # %%
 adata_pseudobulk.raw = adata_pseudobulk
-sc.pp.normalize_total(adata_pseudobulk, target_sum=adata.uns['normalize_total_target_sum'])
+sc.pp.normalize_total(adata_pseudobulk, target_sum=normalize_sum)
 
 # %%
 adata_pseudobulk = adata_pseudobulk[:, adata.var.index]
@@ -116,22 +119,6 @@ X = adata_pseudobulk.X - adata.var['x_mean'].values
 X = np.asarray(X @ adata.varm['PCs'])
 adata_pseudobulk.obsm['X_pca'] = X
 adata_pseudobulk.obsm['X_lda'] = lda.transform(X)
-
-# %%
-# Add study, subject_ID to adata_pseudobulk.obs
-# TODO Move this preprocess.py
-
-df = (adata.obs[['sample', 'donor_id', 'study']]
-      .drop_duplicates()
-      .reset_index(drop=True))
-
-assert set(df['sample']) == set(adata_pseudobulk.obs.index)
-
-df['sample'] = df['sample'].astype(str)
-df = df.set_index('sample')
-df = df.loc[adata_pseudobulk.obs.index]
-
-adata_pseudobulk.obs = df
 
 # %%
 keep = adata_pseudobulk.obs['study'] == validation_study
@@ -144,6 +131,7 @@ keep = adata.obs['cohort'] == 'reference'
 adata_ref = adata[keep,:]
 res = scdqp.estimate_weights_multisample(adata_ref.obsm['X_lda'],
                                          adata_pseudobulk.obsm['X_lda'])
+# TODO Add timing here? Or maybe in the function itself
 
 # %%
 # Make a dataframe for plotting the weights on UMAP
@@ -178,43 +166,8 @@ df['weight_trunc'] = weight_trunc
     gg.scale_color_cmap(trans=scales.log_trans(base=10)))
 
 # %%
-
-# TODO Move this to preprocess.py
-
-adata.obs['ann_finest_1'] = adata.obs['ann_level_1']
-
-for i in range(2,6):
-    ann_finest = adata.obs[f'ann_level_{i}'].astype(str)
-    is_none = (ann_finest == 'None')
-    ann_finest[is_none] = adata.obs[f'ann_finest_{i-1}'][is_none]
-    adata.obs[f'ann_finest_{i}'] = ann_finest
-
-# %%
-assert (adata.obs['ann_finest_level'] == adata.obs['ann_finest_5']).all()
-
-# %%
-# TODO Move this to preprocess.py
-df_frac_umi = []
-
-for i in range(1, 6):
-    df = adata.obs.rename(columns={f'ann_finest_{i}': 'celltype'})
-    df = (df[['sample', 'celltype', 'n_umi']]
-    .groupby(['sample', 'celltype'], observed=False)
-    .sum()
-    .reset_index())
-
-    denom = (df[['sample', 'n_umi']]
-             .groupby('sample', observed=False)
-             .sum()
-             .loc[df['sample']]['n_umi']
-             .values)
-
-    df['frac_umi'] = df['n_umi'] / denom
-    df['ann_level'] = f'lvl{i}'
-    df_frac_umi.append(df)
-
-df_frac_umi = pd.concat(df_frac_umi)
-df_frac_umi
+df_abundance = pd.read_csv('data/abundances.csv')
+df_abundance
 
 # %%
 # Make a dataframe for plotting the weights on UMAP
@@ -227,7 +180,7 @@ for i in range(1, 6):
         index = adata_ref.obs.index
     )
 
-    df['celltype'] = adata_ref.obs[f'ann_finest_{i}']
+    df['celltype'] = adata_ref.obs[f'celltype_lvl{i}']
 
     df = pd.melt(df, id_vars=['celltype'],
                 var_name='sample', value_name='weight')
@@ -240,15 +193,15 @@ df_est_frac_umi = pd.concat(df_est_frac_umi).reset_index().set_index(['ann_level
 df_est_frac_umi
 
 # %%
-df = df_frac_umi
+df = df_abundance
 df = df[df['sample'].isin(adata_pseudobulk.obs.index)]
-df['est_frac'] = df_est_frac_umi.loc[zip(df['ann_level'], df['sample'], df['celltype'])].values
+df['est_frac_umi'] = df_est_frac_umi.loc[zip(df['ann_level'], df['sample'], df['celltype'])].values
 df['sample'] = df['sample'].astype(str)
 df
 
 # %%
 (gg.ggplot(df.sample(frac=1), 
-           gg.aes(x="frac_umi", y="est_frac", color="ann_level", shape="sample")) +
+           gg.aes(x="frac_umi", y="est_frac_umi", color="ann_level", shape="sample")) +
     gg.geom_point() +
     gg.geom_abline(linetype='dashed') +
     gg.scale_x_sqrt() + gg.scale_y_sqrt() +
@@ -323,31 +276,6 @@ df['weight_trunc'] = weight_trunc
     gg.scale_color_cmap(trans=scales.log_trans(base=10)))
 
 # %%
-# TODO Move this to preprocess.py
-df_frac_cells = []
-
-for i in range(1, 6):
-    df = adata.obs.rename(columns={f'ann_finest_{i}': 'celltype'})
-    df = (df[['sample', 'celltype']]
-    .groupby(['sample', 'celltype'], observed=False)
-    .size()
-    .to_frame('n_cell')
-    .reset_index())
-
-    denom = (df[['sample', 'n_cell']]
-             .groupby('sample', observed=False)
-             .sum()
-             .loc[df['sample']]['n_cell']
-             .values)
-
-    df['frac_cells'] = df['n_cell'] / denom
-    df['ann_level'] = f'lvl{i}'
-    df_frac_cells.append(df)
-
-df_frac_cells = pd.concat(df_frac_cells)
-df_frac_cells
-
-# %%
 # Make a dataframe for plotting the weights on UMAP
 df_est_frac_cells = []
 
@@ -358,7 +286,7 @@ for i in range(1, 6):
         index = adata_ref.obs.index
     )
 
-    df['celltype'] = adata_ref.obs[f'ann_finest_{i}']
+    df['celltype'] = adata_ref.obs[f'celltype_lvl{i}']
 
     df = pd.melt(df, id_vars=['celltype'],
                 var_name='sample', value_name='weight')
@@ -371,15 +299,15 @@ df_est_frac_cells = pd.concat(df_est_frac_cells).reset_index().set_index(['ann_l
 df_est_frac_cells
 
 # %%
-df = df_frac_cells
+df = df_abundance
 df = df[df['sample'].isin(adata_pseudobulk.obs.index)]
-df['est_frac'] = df_est_frac_cells.loc[zip(df['ann_level'], df['sample'], df['celltype'])].values
+df['est_frac_cell'] = df_est_frac_cells.loc[zip(df['ann_level'], df['sample'], df['celltype'])].values
 df['sample'] = df['sample'].astype(str)
 df
 
 # %%
 (gg.ggplot(df.sample(frac=1), 
-           gg.aes(x="frac_cells", y="est_frac", color="ann_level", shape="sample")) +
+           gg.aes(x="frac_cell", y="est_frac_cell", color="ann_level", shape="sample")) +
     gg.geom_point() +
     gg.geom_abline(linetype='dashed') +
     gg.scale_x_sqrt() + gg.scale_y_sqrt() +
@@ -388,7 +316,7 @@ df
 # %%
 # TODO adjust x,y labels of sqrt scaled plots
 # TODO only show 1 umap weights plot
-# TODO move stuff to preprocess
 # TODO Add explanatory text (e.g. about the alveolar macrophages)
 # TODO Move poisson regression into package helper function
+# TODO Move reweighting into package helper function
 # TODO Use seed for pandas row shuffling
