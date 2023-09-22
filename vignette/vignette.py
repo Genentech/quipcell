@@ -31,8 +31,6 @@ import scanpy as sc
 
 import scipy.sparse
 
-from sklearn.preprocessing import OneHotEncoder
-from sklearn import linear_model
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 import scDensQP as scdqp
@@ -58,6 +56,7 @@ adata.X = scipy.sparse.diags(normalize_sum / adata.obs['n_umi'].values) @ adata.
 # TODO Just use scanpy normalize_total() instead? Even tho it doesn't
 # account for the non-hvgs, it's probably fine, and would simplify exposition.
 # NOTE that the order of normalization of pseudobulks would also have to change.
+# Maybe should also adjust the size factor estimates to use the hvgs sum instead of total umi sum?
 
 # %%
 sc.pp.pca(adata, n_comps=100)
@@ -208,23 +207,12 @@ df
     gg.theme_bw(base_size=16))
 
 # %%
-enc = OneHotEncoder()
-
-# %%
-modmat = enc.fit_transform(adata_ref.obs['sample'].values.reshape(-1, 1))
-
-# %%
-X = np.hstack([adata_ref.obsm['X_lda'], np.asarray(modmat.todense())])
-
-# %%
-clf = linear_model.PoissonRegressor(fit_intercept=False, alpha=0, solver='newton-cholesky', verbose=1)
-y = adata_ref.obs['n_umi'].values
-clf.fit(X, y)
-
-# %%
-size_factors = np.exp(adata_ref.obsm['X_lda'] @ clf.coef_[:adata_ref.obsm['X_lda'].shape[1]])
-size_factors = size_factors / np.sum(size_factors)
-size_factors
+size_factors = scdqp.estimate_size_factors(
+    adata_ref.obsm['X_lda'],
+    adata_ref.obs['n_umi'].values,
+    adata_ref.obs['sample'].values
+)
+# TODO kwargs to control verbosity and other args
 
 # %%
 df = pd.DataFrame(
@@ -239,9 +227,7 @@ df['size_factor'] = size_factors
     gg.scale_color_cmap(trans=scales.log_trans(base=10)))
 
 # %%
-res_reweight = np.einsum("ij,i->ij", res, 1/size_factors)
-res_reweight = np.einsum("ij,j->ij", res_reweight, 1/res_reweight.sum(axis=0))
-assert np.allclose(res_reweight.sum(axis=0), 1)
+res_reweight = scdqp.renormalize_weights(res, size_factors)
 
 # %%
 # Make a dataframe for plotting the weights on UMAP

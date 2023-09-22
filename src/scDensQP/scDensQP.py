@@ -1,9 +1,14 @@
 import logging
 
 import numpy as np
-import cvxpy as cp
+import pandas as pd
 
 import scipy.sparse
+
+import cvxpy as cp
+
+from sklearn import linear_model
+from sklearn.preprocessing import OneHotEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -84,3 +89,23 @@ def estimate_weights(X, mu, quad_form=True, solve_kwargs=None):
 
 # TODO: Add accelerated projected gradient descent solver? E.g. see:
 # https://stackoverflow.com/questions/65526377/cvxpy-returns-infeasible-inaccurate-on-quadratic-programming-optimization-proble
+
+def renormalize_weights(weights, size_factors):
+    weights = np.einsum("ij,i->ij", weights, 1/size_factors)
+    weights = np.einsum("ij,j->ij", weights, 1/weights.sum(axis=0))
+    assert np.allclose(weights.sum(axis=0), 1)
+    return weights
+
+def estimate_size_factors(X, n_reads, sample):
+    enc = OneHotEncoder()
+
+    modmat = enc.fit_transform(sample.reshape(-1, 1))
+    modmat = np.hstack([X, np.asarray(modmat.todense())])
+    
+    clf = linear_model.PoissonRegressor(fit_intercept=False, alpha=0,
+                                        solver='newton-cholesky', verbose=1)
+    clf.fit(modmat, n_reads)
+
+    size_factors = np.exp(X @ clf.coef_[:X.shape[1]])
+    size_factors = size_factors / np.mean(size_factors)
+    return size_factors
