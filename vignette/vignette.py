@@ -41,9 +41,6 @@ adata = ad.read_h5ad("data/hlca_hvgs.h5ad")
 
 
 # %%
-adata
-
-# %%
 # TODO make this less ugly
 # Or just delete it?
 sc.pl.umap(adata, color='ann_finest_level', legend_loc='on data')
@@ -133,10 +130,44 @@ res = scdqp.estimate_weights_multisample(adata_ref.obsm['X_lda'],
 # TODO Add timing here? Or maybe in the function itself
 
 # %%
+size_factors = scdqp.estimate_size_factors(
+    adata_ref.obsm['X_lda'],
+    adata_ref.obs['n_umi'].values,
+    adata_ref.obs['sample'].values,
+    #verbose=True
+)
+# TODO kwargs to control verbosity and other args
+
+res_reweight = scdqp.renormalize_weights(res, size_factors)
+
+# %%
+# TODO Make a helper function for plotting weights?
+
+# Dataframe for plotting the weights on UMAP
+df = pd.DataFrame(
+    np.hstack([adata_ref.obsm['X_umap'], res]),
+    columns = ['UMAP1', 'UMAP2'] + list(adata_pseudobulk.obs.index)
+)
+
+# pivot to long format
+df = pd.melt(df, id_vars=['UMAP1', 'UMAP2'],
+             var_name='sample', value_name='weight')
+
+# set very small weights to 0 for plotting purposes
+weight_trunc = df['weight'].values.copy()
+weight_trunc[weight_trunc < 1e-9] = 0
+df['weight_trunc'] = weight_trunc
+
+(gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight_trunc")) +
+    gg.geom_point(size=.25, alpha=.5) +
+    gg.facet_wrap("~sample") +
+    gg.scale_color_cmap(trans=scales.log_trans(base=10)))
+
+# %%
 # Make a dataframe for plotting the weights on UMAP
 df = np.hstack(
     [adata_ref.obsm['X_umap'],
-     res]
+     res_reweight]
 )
 
 df = pd.DataFrame(
@@ -152,17 +183,16 @@ weight_trunc = df['weight'].values.copy()
 weight_trunc[weight_trunc < 1e-9] = 0
 df['weight_trunc'] = weight_trunc
 
-# %%
-(gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight")) +
-    gg.geom_point(size=.25, alpha=.5) +
+(gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight_trunc")) +
+    gg.geom_point(size=.125, alpha=.5) +
     gg.facet_wrap("~sample") +
     gg.scale_color_cmap(trans=scales.log_trans(base=10)))
 
 # %%
-(gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight_trunc")) +
-    gg.geom_point(size=.25, alpha=.5) +
-    gg.facet_wrap("~sample") +
-    gg.scale_color_cmap(trans=scales.log_trans(base=10)))
+adata_ref.obs['size_factor'] = size_factors
+adata_ref.obs['size_factor_log10'] = np.log10(size_factors)
+
+sc.pl.umap(adata_ref, color=['size_factor', 'size_factor_log10'])
 
 # %%
 df_abundance = pd.read_csv('data/abundances.csv')
@@ -192,76 +222,6 @@ df_est_frac_umi = pd.concat(df_est_frac_umi).reset_index().set_index(['ann_level
 df_est_frac_umi
 
 # %%
-df = df_abundance
-df = df[df['sample'].isin(adata_pseudobulk.obs.index)]
-df['est_frac_umi'] = df_est_frac_umi.loc[zip(df['ann_level'], df['sample'], df['celltype'])].values
-df['sample'] = df['sample'].astype(str)
-df
-
-# %%
-(gg.ggplot(df.sample(frac=1), 
-           gg.aes(x="frac_umi", y="est_frac_umi", color="ann_level", shape="sample")) +
-    gg.geom_point() +
-    gg.geom_abline(linetype='dashed') +
-    gg.scale_x_sqrt() + gg.scale_y_sqrt() +
-    gg.theme_bw(base_size=16))
-
-# %%
-size_factors = scdqp.estimate_size_factors(
-    adata_ref.obsm['X_lda'],
-    adata_ref.obs['n_umi'].values,
-    adata_ref.obs['sample'].values
-)
-# TODO kwargs to control verbosity and other args
-
-# %%
-df = pd.DataFrame(
-    adata_ref.obsm['X_umap'],
-    columns=['UMAP1','UMAP2']
-)
-
-df['size_factor'] = size_factors
-
-(gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="size_factor")) +
-    gg.geom_point(size=.5, alpha=.5) +
-    gg.scale_color_cmap(trans=scales.log_trans(base=10)))
-
-# %%
-res_reweight = scdqp.renormalize_weights(res, size_factors)
-
-# %%
-# Make a dataframe for plotting the weights on UMAP
-df = np.hstack(
-    [adata_ref.obsm['X_umap'],
-     res_reweight]
-)
-
-df = pd.DataFrame(
-    df,
-    columns = ['UMAP1', 'UMAP2'] + list(adata_pseudobulk.obs.index)
-)
-
-df = pd.melt(df, id_vars=['UMAP1', 'UMAP2'],
-             var_name='sample', value_name='weight')
-
-# set very small weights to 0 for plotting purposes
-weight_trunc = df['weight'].values.copy()
-weight_trunc[weight_trunc < 1e-9] = 0
-df['weight_trunc'] = weight_trunc
-
-# %%
-(gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight")) +
-    gg.geom_point(size=.25, alpha=.5) +
-    gg.facet_wrap("~sample") +
-    gg.scale_color_cmap(trans=scales.log_trans(base=10)))
-
-# %%
-(gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight_trunc")) +
-    gg.geom_point(size=.125, alpha=.5) +
-    gg.facet_wrap("~sample") +
-    gg.scale_color_cmap(trans=scales.log_trans(base=10)))
-
-# %%
 # Make a dataframe for plotting the weights on UMAP
 df_est_frac_cells = []
 
@@ -287,9 +247,18 @@ df_est_frac_cells
 # %%
 df = df_abundance
 df = df[df['sample'].isin(adata_pseudobulk.obs.index)]
+df['est_frac_umi'] = df_est_frac_umi.loc[zip(df['ann_level'], df['sample'], df['celltype'])].values
 df['est_frac_cell'] = df_est_frac_cells.loc[zip(df['ann_level'], df['sample'], df['celltype'])].values
 df['sample'] = df['sample'].astype(str)
 df
+
+# %%
+(gg.ggplot(df.sample(frac=1), 
+           gg.aes(x="frac_umi", y="est_frac_umi", color="ann_level", shape="sample")) +
+    gg.geom_point() +
+    gg.geom_abline(linetype='dashed') +
+    gg.scale_x_sqrt() + gg.scale_y_sqrt() +
+    gg.theme_bw(base_size=16))
 
 # %%
 (gg.ggplot(df.sample(frac=1), 
@@ -303,6 +272,4 @@ df
 # TODO adjust x,y labels of sqrt scaled plots
 # TODO only show 1 umap weights plot
 # TODO Add explanatory text (e.g. about the alveolar macrophages)
-# TODO Move poisson regression into package helper function
-# TODO Move reweighting into package helper function
 # TODO Use seed for pandas row shuffling
