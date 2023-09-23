@@ -32,6 +32,7 @@ import scanpy as sc
 import scipy.sparse
 
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.preprocessing import OneHotEncoder
 
 import scDensQP as scdqp
 import cvxpy as cp
@@ -141,19 +142,17 @@ size_factors = scdqp.estimate_size_factors(
 res_reweight = scdqp.renormalize_weights(res, size_factors)
 
 # %%
-# TODO Make a helper function for plotting weights?
-
-# Dataframe for plotting the weights on UMAP
+# Dataframe for plotting UMI-level weights on UMAP
 df = pd.DataFrame(
     np.hstack([adata_ref.obsm['X_umap'], res]),
     columns = ['UMAP1', 'UMAP2'] + list(adata_pseudobulk.obs.index)
+).melt( # pivot to long format
+    id_vars=['UMAP1', 'UMAP2'],  
+    var_name='sample', 
+    value_name='weight'
 )
 
-# pivot to long format
-df = pd.melt(df, id_vars=['UMAP1', 'UMAP2'],
-             var_name='sample', value_name='weight')
-
-# set very small weights to 0 for plotting purposes
+# set very small weights to 0 for prettier plotting
 weight_trunc = df['weight'].values.copy()
 weight_trunc[weight_trunc < 1e-9] = 0
 df['weight_trunc'] = weight_trunc
@@ -164,27 +163,23 @@ df['weight_trunc'] = weight_trunc
     gg.scale_color_cmap(trans=scales.log_trans(base=10)))
 
 # %%
-# Make a dataframe for plotting the weights on UMAP
-df = np.hstack(
-    [adata_ref.obsm['X_umap'],
-     res_reweight]
-)
-
+# Dataframe for plotting cell-level weights on UMAP
 df = pd.DataFrame(
-    df,
+    np.hstack([adata_ref.obsm['X_umap'], res_reweight]),
     columns = ['UMAP1', 'UMAP2'] + list(adata_pseudobulk.obs.index)
+).melt( # pivot to long format
+    id_vars=['UMAP1', 'UMAP2'],  
+    var_name='sample', 
+    value_name='weight'
 )
 
-df = pd.melt(df, id_vars=['UMAP1', 'UMAP2'],
-             var_name='sample', value_name='weight')
-
-# set very small weights to 0 for plotting purposes
+# set very small weights to 0 for prettier plotting
 weight_trunc = df['weight'].values.copy()
 weight_trunc[weight_trunc < 1e-9] = 0
 df['weight_trunc'] = weight_trunc
 
 (gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight_trunc")) +
-    gg.geom_point(size=.125, alpha=.5) +
+    gg.geom_point(size=.25, alpha=.5) +
     gg.facet_wrap("~sample") +
     gg.scale_color_cmap(trans=scales.log_trans(base=10)))
 
@@ -196,64 +191,49 @@ sc.pl.umap(adata_ref, color=['size_factor', 'size_factor_log10'])
 
 # %%
 df_abundance = pd.read_csv('data/abundances.csv')
+df_abundance = df_abundance[df_abundance['sample'].isin(adata_pseudobulk.obs.index)]
+df_abundance['sample'] = df_abundance['sample'].astype(str)
 df_abundance
 
 # %%
-# Make a dataframe for plotting the weights on UMAP
-df_est_frac_umi = []
+est_frac_umi = []
+est_frac_cells = []
 
 for i in range(1, 6):
-    df = pd.DataFrame(
-        res,
-        columns = adata_pseudobulk.obs.index,
-        index = adata_ref.obs.index
+    enc = OneHotEncoder()
+    mat_onehot = enc.fit_transform(
+        adata_ref.obs[f'celltype_lvl{i}'].values.reshape(-1,1)
     )
 
-    df['celltype'] = adata_ref.obs[f'celltype_lvl{i}']
+    # Function to sum weights by celltype, then pivot to long dataframe
+    def aggregate_and_reshape(w):
+        return pd.DataFrame(
+            w.T @ mat_onehot,
+            columns = enc.categories_[0],
+            index = adata_pseudobulk.obs.index
+        ).reset_index(names='sample').melt(
+            id_vars=['sample'], var_name=['celltype'], value_name='weight'
+        ).assign(ann_level=f'lvl{i}')
 
-    df = pd.melt(df, id_vars=['celltype'],
-                var_name='sample', value_name='weight')
+    est_frac_umi.append(aggregate_and_reshape(res))
+    est_frac_cells.append(aggregate_and_reshape(res_reweight))
 
-    df = df.groupby(['sample', 'celltype'], observed=False).sum()
-    df['ann_level'] = f'lvl{i}'
-    df_est_frac_umi.append(df)
+idx_keys = ['ann_level', 'sample', 'celltype']
 
-df_est_frac_umi = pd.concat(df_est_frac_umi).reset_index().set_index(['ann_level', 'sample', 'celltype'])
-df_est_frac_umi
+df_abundance['est_frac_umi'] = (pd.concat(est_frac_umi)
+                                .set_index(idx_keys)
+                                .loc[zip(*[df_abundance[k] for k in idx_keys])]
+                                .values)
 
-# %%
-# Make a dataframe for plotting the weights on UMAP
-df_est_frac_cells = []
+df_abundance['est_frac_cell'] = (pd.concat(est_frac_cells)
+                                .set_index(idx_keys)
+                                .loc[zip(*[df_abundance[k] for k in idx_keys])]
+                                .values)
 
-for i in range(1, 6):
-    df = pd.DataFrame(
-        res_reweight,
-        columns = adata_pseudobulk.obs.index,
-        index = adata_ref.obs.index
-    )
-
-    df['celltype'] = adata_ref.obs[f'celltype_lvl{i}']
-
-    df = pd.melt(df, id_vars=['celltype'],
-                var_name='sample', value_name='weight')
-
-    df = df.groupby(['sample', 'celltype'], observed=False).sum()
-    df['ann_level'] = f'lvl{i}'
-    df_est_frac_cells.append(df)
-
-df_est_frac_cells = pd.concat(df_est_frac_cells).reset_index().set_index(['ann_level', 'sample', 'celltype'])
-df_est_frac_cells
+df_abundance
 
 # %%
-df = df_abundance
-df = df[df['sample'].isin(adata_pseudobulk.obs.index)]
-df['est_frac_umi'] = df_est_frac_umi.loc[zip(df['ann_level'], df['sample'], df['celltype'])].values
-df['est_frac_cell'] = df_est_frac_cells.loc[zip(df['ann_level'], df['sample'], df['celltype'])].values
-df['sample'] = df['sample'].astype(str)
-df
-
-# %%
-(gg.ggplot(df.sample(frac=1), 
+(gg.ggplot(df_abundance.sample(frac=1, random_state=42), 
            gg.aes(x="frac_umi", y="est_frac_umi", color="ann_level", shape="sample")) +
     gg.geom_point() +
     gg.geom_abline(linetype='dashed') +
@@ -261,7 +241,7 @@ df
     gg.theme_bw(base_size=16))
 
 # %%
-(gg.ggplot(df.sample(frac=1), 
+(gg.ggplot(df_abundance.sample(frac=1, random_state=42), 
            gg.aes(x="frac_cell", y="est_frac_cell", color="ann_level", shape="sample")) +
     gg.geom_point() +
     gg.geom_abline(linetype='dashed') +
@@ -270,6 +250,4 @@ df
 
 # %%
 # TODO adjust x,y labels of sqrt scaled plots
-# TODO only show 1 umap weights plot
 # TODO Add explanatory text (e.g. about the alveolar macrophages)
-# TODO Use seed for pandas row shuffling
