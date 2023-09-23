@@ -196,9 +196,13 @@ df_abundance['sample'] = df_abundance['sample'].astype(str)
 df_abundance
 
 # %%
+# TODO this might be clearer if we had a list of abundances per level,
+# and added the weights to each level separately, before concatenating at the end
+
 est_frac_umi = []
 est_frac_cells = []
 
+# TODO use a more descriptive variable name than i
 for i in range(1, 6):
     enc = OneHotEncoder()
     mat_onehot = enc.fit_transform(
@@ -218,17 +222,18 @@ for i in range(1, 6):
     est_frac_umi.append(aggregate_and_reshape(res))
     est_frac_cells.append(aggregate_and_reshape(res_reweight))
 
-idx_keys = ['ann_level', 'sample', 'celltype']
 
-df_abundance['est_frac_umi'] = (pd.concat(est_frac_umi)
-                                .set_index(idx_keys)
-                                .loc[zip(*[df_abundance[k] for k in idx_keys])]
-                                .values)
+# Function to combine the summed weights across annotation levels,
+# returning a vector to be added to df_abundance
+def concat_aggregated_weights(agg_weight_list):
+    idx_keys = ['ann_level', 'sample', 'celltype']
+    return (pd.concat(agg_weight_list)
+            .set_index(idx_keys)
+            .loc[zip(*[df_abundance[k] for k in idx_keys])]
+            .values)
 
-df_abundance['est_frac_cell'] = (pd.concat(est_frac_cells)
-                                .set_index(idx_keys)
-                                .loc[zip(*[df_abundance[k] for k in idx_keys])]
-                                .values)
+df_abundance['est_frac_umi'] = concat_aggregated_weights(est_frac_umi)
+df_abundance['est_frac_cell'] = concat_aggregated_weights(est_frac_cells)
 
 df_abundance
 
