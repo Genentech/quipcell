@@ -250,4 +250,5 @@ df_abundance
 
 # %%
 # TODO adjust x,y labels of sqrt scaled plots
+# TODO better variable names for res, res_reweight
 # TODO Add explanatory text (e.g. about the alveolar macrophages)
