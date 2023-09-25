@@ -126,8 +126,8 @@ adata_pseudobulk = adata_pseudobulk[keep,:]
 keep = adata.obs['cohort'] == 'reference'
 #keep = adata.obs['cohort'] != 'validation'
 adata_ref = adata[keep,:]
-res = scdqp.estimate_weights_multisample(adata_ref.obsm['X_lda'],
-                                         adata_pseudobulk.obsm['X_lda'])
+w_umi = scdqp.estimate_weights_multisample(adata_ref.obsm['X_lda'],
+                                           adata_pseudobulk.obsm['X_lda'])
 
 # %%
 size_factors = scdqp.estimate_size_factors(
@@ -137,12 +137,12 @@ size_factors = scdqp.estimate_size_factors(
     #verbose=True
 )
 
-res_reweight = scdqp.renormalize_weights(res, size_factors)
+w_cell = scdqp.renormalize_weights(w_umi, size_factors)
 
 # %%
 # Dataframe for plotting UMI-level weights on UMAP
 df = pd.DataFrame(
-    np.hstack([adata_ref.obsm['X_umap'], res]),
+    np.hstack([adata_ref.obsm['X_umap'], w_umi]),
     columns = ['UMAP1', 'UMAP2'] + list(adata_pseudobulk.obs.index)
 ).melt( # pivot to long format
     id_vars=['UMAP1', 'UMAP2'],  
@@ -163,7 +163,7 @@ df['weight_trunc'] = weight_trunc
 # %%
 # Dataframe for plotting cell-level weights on UMAP
 df = pd.DataFrame(
-    np.hstack([adata_ref.obsm['X_umap'], res_reweight]),
+    np.hstack([adata_ref.obsm['X_umap'], w_cell]),
     columns = ['UMAP1', 'UMAP2'] + list(adata_pseudobulk.obs.index)
 ).melt( # pivot to long format
     id_vars=['UMAP1', 'UMAP2'],  
@@ -217,8 +217,8 @@ for i in range(1, 6):
             id_vars=['sample'], var_name=['celltype'], value_name='weight'
         ).assign(ann_level=f'lvl{i}')
 
-    est_frac_umi.append(aggregate_and_reshape(res))
-    est_frac_cells.append(aggregate_and_reshape(res_reweight))
+    est_frac_umi.append(aggregate_and_reshape(w_umi))
+    est_frac_cells.append(aggregate_and_reshape(w_cell))
 
 
 # Function to combine the summed weights across annotation levels,
@@ -240,7 +240,8 @@ df_abundance
            gg.aes(x="frac_umi", y="est_frac_umi", color="ann_level", shape="sample")) +
     gg.geom_point() +
     gg.geom_abline(linetype='dashed') +
-    gg.scale_x_sqrt() + gg.scale_y_sqrt() +
+    gg.scale_x_sqrt(breaks=[.01,.1,.2,.4,.6,.8]) +
+    gg.scale_y_sqrt(breaks=[.01,.1,.2,.4,.6,.8]) +
     gg.theme_bw(base_size=16))
 
 # %%
@@ -248,10 +249,9 @@ df_abundance
            gg.aes(x="frac_cell", y="est_frac_cell", color="ann_level", shape="sample")) +
     gg.geom_point() +
     gg.geom_abline(linetype='dashed') +
-    gg.scale_x_sqrt() + gg.scale_y_sqrt() +
+    gg.scale_x_sqrt(breaks=[.01,.1,.2,.4,.6,.8]) +
+    gg.scale_y_sqrt(breaks=[.01,.1,.2,.4,.6,.8]) +
     gg.theme_bw(base_size=16))
 
 # %%
-# TODO adjust x,y labels of sqrt scaled plots
-# TODO better variable names for res, res_reweight
 # TODO Add explanatory text (e.g. about the alveolar macrophages)
