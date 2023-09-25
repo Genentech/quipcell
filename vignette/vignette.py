@@ -128,7 +128,6 @@ keep = adata.obs['cohort'] == 'reference'
 adata_ref = adata[keep,:]
 res = scdqp.estimate_weights_multisample(adata_ref.obsm['X_lda'],
                                          adata_pseudobulk.obsm['X_lda'])
-# TODO Add timing here? Or maybe in the function itself
 
 # %%
 size_factors = scdqp.estimate_size_factors(

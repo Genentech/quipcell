@@ -1,5 +1,7 @@
 import logging
 
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
 
@@ -15,9 +17,12 @@ logger = logging.getLogger(__name__)
 def estimate_weights_multisample(X, mu_multisample,
                                  renormalize=True,
                                  **kwargs):
+    start = datetime.now()
+
     w_hat_multisample = []
 
-    for i in range(mu_multisample.shape[0]):
+    n = mu_multisample.shape[0]
+    for i in range(n):
         prob = estimate_weights(X, mu_multisample[i,:],
                                 **kwargs)
 
@@ -34,6 +39,9 @@ def estimate_weights_multisample(X, mu_multisample,
     if renormalize:
         ret[ret < 0] = 0
         ret = np.einsum("ij,j->ij", ret, 1.0 / ret.sum(axis=0))
+
+    interval = (datetime.now() - start).total_seconds()
+    logger.info(f"Finished {n} samples in {interval} seconds.")
 
     return ret
 
