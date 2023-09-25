@@ -104,14 +104,19 @@ def renormalize_weights(weights, size_factors):
     assert np.allclose(weights.sum(axis=0), 1)
     return weights
 
-def estimate_size_factors(X, n_reads, sample):
+def estimate_size_factors(X, n_reads, sample, **kwargs):
     enc = OneHotEncoder()
 
     modmat = enc.fit_transform(sample.reshape(-1, 1))
     modmat = np.hstack([X, np.asarray(modmat.todense())])
     
-    clf = linear_model.PoissonRegressor(fit_intercept=False, alpha=0,
-                                        solver='newton-cholesky', verbose=1)
+    kwargs.setdefault("fit_intercept", False)
+    kwargs.setdefault("alpha", 0)
+    kwargs.setdefault("solver", "newton-cholesky")
+    kwargs.setdefault("verbose", 0)
+
+    clf = linear_model.PoissonRegressor(**kwargs)
+
     clf.fit(modmat, n_reads)
 
     size_factors = np.exp(X @ clf.coef_[:X.shape[1]])

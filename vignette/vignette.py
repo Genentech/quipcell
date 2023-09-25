@@ -136,7 +136,6 @@ size_factors = scdqp.estimate_size_factors(
     adata_ref.obs['sample'].values,
     #verbose=True
 )
-# TODO kwargs to control verbosity and other args
 
 res_reweight = scdqp.renormalize_weights(res, size_factors)
 
