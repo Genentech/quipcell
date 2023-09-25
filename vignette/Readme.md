@@ -1,3 +1,4 @@
+# Readme for quickbeam vignette
 
 Download the h5ad for the HLCA core dataset from:
 
@@ -16,36 +17,17 @@ curl -o local.h5ad ...
 mv local.h5ad hlca_orig.h5ad
 ```
 
-Create a conda env, install scanpy, then install this package:
-
-```
-conda create -n quickbeam
-conda activate quickbeam
-conda install -c conda-forge scanpy python-igraph leidenalg
-pip install ..
-```
-
-Also install ipykernel and add it to your jupyter:
-
-```
-conda install ipykernel
-python -m ipykernel install --name quickbeam
-```
-
-(Note: May need to add --user flag to ipykernel install, depending on
-OS)
-
-
 Next, run
 ```
 python preprocess.py
 ```
 Which loads the full HLCA, and then performs some processing to make a
-smaller dataset that is easier to work with in memory.
+smaller dataset that is easier to work with on a laptop. This step can
+take a lot of memory; I was able to run it on my laptop after closing
+all other applications, but your mileage may vary.
 
-Note that loading the full HLCA takes a lot of memory. I was able to
-run the preprocessing script on my laptop when I closed all other
-applications, but swap did get a hit, and your mileage may vary.
+Alternatively, you can download the preprocessed data at TODO.
 
-After running the preprocessing script, the dataset is much smaller,
-and the jupyter notebook should be runnable on most laptops.
+After preprocessing the data, the dataset is much smaller, and the
+jupyter notebook for the [vignette](vignette.ipynb) can be run on a
+standard laptop.
