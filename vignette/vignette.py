@@ -42,64 +42,43 @@ adata = ad.read_h5ad("data/hlca_hvgs.h5ad")
 
 
 # %%
-# TODO make this less ugly
-# Or just delete it?
-sc.pl.umap(adata, color='ann_finest_level', legend_loc='on data')
-
-# %%
 # Normalize
 normalize_sum = 1000
 adata.X = scipy.sparse.diags(normalize_sum / adata.obs['n_umi'].values) @ adata.X
 
-# TODO Just use scanpy normalize_total() instead? Even tho it doesn't
-# account for the non-hvgs, it's probably fine, and would simplify exposition.
-# NOTE that the order of normalization of pseudobulks would also have to change.
-# Maybe should also adjust the size factor estimates to use the hvgs sum instead of total umi sum?
+# %%
+validation_study = 'Krasnow_2020'
+
+rng = np.random.default_rng(12345)
+n = adata.obs.shape[0]
+
+keep = adata.obs['study'] != validation_study
+keep = keep & (rng.random(size=n) < .125)
+
+adata_ref = adata[keep,:]
 
 # %%
-sc.pp.pca(adata, n_comps=100)
+adata_ref
 
-# TODO: Is PCA really necessary? Could we just use LDA directly on the counts?
+# %%
+sc.pp.pca(adata_ref, n_comps=100)
 
 # %%
 # since the PCA is zero-centered, we need to save the gene-wise means
 # to apply PCA rotation to pseudobulks
-gene_means = adata.X.mean(axis=0)
+gene_means = adata_ref.X.mean(axis=0)
 gene_means = np.squeeze(np.asarray(gene_means))
-adata.var['x_mean'] = gene_means
-
-# %%
-# seed from secrets.randbits(128)
-rng = np.random.default_rng(293711445274383262807231515229626646634)
-
-adata.obs['cohort'] = 'query'
-
-n = adata.obs.shape[0]
-
-# for speed reasons, use a smaller reference
-adata.obs['cohort'][rng.random(size=n) < .125] = 'reference'
-
-validation_study = 'Krasnow_2020'
-
-adata.obs['cohort'][adata.obs['study'] == validation_study] = 'validation'
-
-# TODO Simplify this by dropping the query cohort?
-# Just create an adata_ref object instead, and use that for everything (e.g. LDA)
-
-# %%
-Counter(adata.obs['cohort'])
+adata_ref.var['x_mean'] = gene_means
 
 # %%
 lda = LinearDiscriminantAnalysis(n_components=15)
 
-keep = adata.obs['cohort'] != 'validation'
-
-X = adata.obsm['X_pca'][keep,:]
-y = adata.obs['ann_finest_level'][keep]
+X = adata_ref.obsm['X_pca']
+y = adata_ref.obs['ann_finest_level']
 
 lda.fit(X, y)
 
-adata.obsm['X_lda'] = lda.transform(adata.obsm['X_pca'])
+adata_ref.obsm['X_lda'] = lda.transform(adata_ref.obsm['X_pca'])
 
 # %%
 adata_pseudobulk = ad.read_h5ad("data/pseudobulks.h5ad")
@@ -112,8 +91,8 @@ sc.pp.normalize_total(adata_pseudobulk, target_sum=normalize_sum)
 adata_pseudobulk = adata_pseudobulk[:, adata.var.index]
 
 # %%
-X = adata_pseudobulk.X - adata.var['x_mean'].values
-X = np.asarray(X @ adata.varm['PCs'])
+X = adata_pseudobulk.X - adata_ref.var['x_mean'].values
+X = np.asarray(X @ adata_ref.varm['PCs'])
 adata_pseudobulk.obsm['X_pca'] = X
 adata_pseudobulk.obsm['X_lda'] = lda.transform(X)
 
@@ -123,11 +102,8 @@ adata_pseudobulk = adata_pseudobulk[keep,:]
 
 
 # %%
-keep = adata.obs['cohort'] == 'reference'
-#keep = adata.obs['cohort'] != 'validation'
-adata_ref = adata[keep,:]
 w_umi = qb.estimate_weights_multisample(adata_ref.obsm['X_lda'],
-                                             adata_pseudobulk.obsm['X_lda'])
+                                        adata_pseudobulk.obsm['X_lda'])
 
 # %%
 size_factors = qb.estimate_size_factors(
@@ -160,8 +136,8 @@ df['weight_trunc'] = weight_trunc
     gg.facet_wrap("~sample") +
     gg.scale_color_cmap(trans=scales.log_trans(base=10)))
 
-# %%
-# Dataframe for plotting cell-level weights on UMAP
+ # %%
+ # Dataframe for plotting cell-level weights on UMAP
 df = pd.DataFrame(
     np.hstack([adata_ref.obsm['X_umap'], w_cell]),
     columns = ['UMAP1', 'UMAP2'] + list(adata_pseudobulk.obs.index)
@@ -194,9 +170,6 @@ df_abundance['sample'] = df_abundance['sample'].astype(str)
 df_abundance
 
 # %%
-# TODO this might be clearer if we had a list of abundances per level,
-# and added the weights to each level separately, before concatenating at the end
-
 est_frac_umi = []
 est_frac_cells = []
 
@@ -235,8 +208,8 @@ df_abundance['est_frac_cell'] = concat_aggregated_weights(est_frac_cells)
 
 df_abundance
 
-# %%
-(gg.ggplot(df_abundance.sample(frac=1, random_state=42), 
+ # %%
+ (gg.ggplot(df_abundance.sample(frac=1, random_state=42), 
            gg.aes(x="frac_umi", y="est_frac_umi", color="ann_level", shape="sample")) +
     gg.geom_point() +
     gg.geom_abline(linetype='dashed') +
@@ -244,8 +217,8 @@ df_abundance
     gg.scale_y_sqrt(breaks=[.01,.1,.2,.4,.6,.8]) +
     gg.theme_bw(base_size=16))
 
-# %%
-(gg.ggplot(df_abundance.sample(frac=1, random_state=42), 
+ # %%
+ (gg.ggplot(df_abundance.sample(frac=1, random_state=42), 
            gg.aes(x="frac_cell", y="est_frac_cell", color="ann_level", shape="sample")) +
     gg.geom_point() +
     gg.geom_abline(linetype='dashed') +
