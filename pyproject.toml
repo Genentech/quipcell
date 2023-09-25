@@ -1,9 +1,12 @@
 [project]
-name = "scDensQP"
+name = "quickbeam"
 version = "0.0.1"
 dependencies = [
     #"requests",
     "numpy",
+    "scipy",
+    "pandas",
+    "scikit-learn",
     "cvxpy",
     'importlib-metadata; python_version>="3.8"',
 ]

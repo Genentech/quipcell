@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
-import scDensQP as scdqp
+import quickbeam as qb
 
 mu1 = np.array([1,0])
 mu2 = np.array([0,1])
@@ -24,7 +24,7 @@ x2 = mu2 + sigma * rng.normal(size=(n, 2))
 
 x = np.vstack([x1, x2])
 
-w = scdqp.estimate_weights_multisample(x, mu)
+w = qb.estimate_weights_multisample(x, mu)
 
 assert np.allclose(w.sum(axis=0), 1)
 

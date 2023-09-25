@@ -19,8 +19,8 @@ mv local.h5ad hlca_orig.h5ad
 Create a conda env, install scanpy, then install this package:
 
 ```
-conda create -n scDensQP
-conda activate scDensQP
+conda create -n quickbeam
+conda activate quickbeam
 conda install -c conda-forge scanpy python-igraph leidenalg
 pip install ..
 ```
@@ -29,7 +29,7 @@ Also install ipykernel and add it to your jupyter:
 
 ```
 conda install ipykernel
-python -m ipykernel install --name scdensqp
+python -m ipykernel install --name quickbeam
 ```
 
 (Note: May need to add --user flag to ipykernel install, depending on

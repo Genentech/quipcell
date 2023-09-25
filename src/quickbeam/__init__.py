@@ -1,5 +1,5 @@
 
-from .scDensQP import (
+from .quickbeam import (
     estimate_weights,
     estimate_weights_multisample,
     renormalize_weights,

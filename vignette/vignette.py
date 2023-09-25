@@ -8,9 +8,9 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.15.1
 #   kernelspec:
-#     display_name: scdensqp
+#     display_name: quickbeam
 #     language: python
-#     name: scdensqp
+#     name: quickbeam
 # ---
 
 # %%
@@ -34,7 +34,7 @@ import scipy.sparse
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.preprocessing import OneHotEncoder
 
-import scDensQP as scdqp
+import quickbeam as qb
 import cvxpy as cp
 
 # %%
@@ -126,18 +126,18 @@ adata_pseudobulk = adata_pseudobulk[keep,:]
 keep = adata.obs['cohort'] == 'reference'
 #keep = adata.obs['cohort'] != 'validation'
 adata_ref = adata[keep,:]
-w_umi = scdqp.estimate_weights_multisample(adata_ref.obsm['X_lda'],
-                                           adata_pseudobulk.obsm['X_lda'])
+w_umi = qb.estimate_weights_multisample(adata_ref.obsm['X_lda'],
+                                             adata_pseudobulk.obsm['X_lda'])
 
 # %%
-size_factors = scdqp.estimate_size_factors(
+size_factors = qb.estimate_size_factors(
     adata_ref.obsm['X_lda'],
     adata_ref.obs['n_umi'].values,
     adata_ref.obs['sample'].values,
     #verbose=True
 )
 
-w_cell = scdqp.renormalize_weights(w_umi, size_factors)
+w_cell = qb.renormalize_weights(w_umi, size_factors)
 
 # %%
 # Dataframe for plotting UMI-level weights on UMAP
