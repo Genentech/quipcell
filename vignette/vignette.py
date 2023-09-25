@@ -13,6 +13,13 @@
 #     name: quickbeam
 # ---
 
+# %% [markdown]
+# # Example application of quickbeam to bulk deconvolution
+#
+# In this vignette, we demonstrate the application of `quickbeam` to bulk deconvolution, replicating some analyses from the manuscript.
+#
+# For our dataset, we use the Human Lung Cell Atlas, which consists of several studies. We hold out one of the studies as a test set, which we use to generate (pseudo)bulk samples with known ground truth.
+
 # %%
 from collections import Counter
 
@@ -37,14 +44,17 @@ from sklearn.preprocessing import OneHotEncoder
 import quickbeam as qb
 import cvxpy as cp
 
+# %% [markdown]
+# ## Load single cell data
+#
+# First, we load the Human Lung Cell Atlas. To make this runnable on a laptop, this has been subset to the raw counts of the highly variable genes only (see `preprocessing.py`).
+
 # %%
 adata = ad.read_h5ad("data/hlca_hvgs.h5ad")
 
 
-# %%
-# Normalize
-normalize_sum = 1000
-adata.X = scipy.sparse.diags(normalize_sum / adata.obs['n_umi'].values) @ adata.X
+# %% [markdown]
+# Next, we subset to 1/8th of the dataset to improve speed. We also exclude one of the studies as a validation test set to benchmark bulk deconvolution.
 
 # %%
 validation_study = 'Krasnow_2020'
@@ -56,21 +66,30 @@ keep = adata.obs['study'] != validation_study
 keep = keep & (rng.random(size=n) < .125)
 
 adata_ref = adata[keep,:]
+print(f"{adata_ref.shape[0]} cells in reference set")
+
+# %% [markdown]
+# ## Normalize and transform single cell data
+#
+# Next, normalize the raw counts. The preprocessing script saved the total UMIs per cell before filtering to highly variable genes, so we divide it out, and normalize to counts per 1000 UMIs.
 
 # %%
-adata_ref
+# Normalize
+normalize_sum = 1000
+adata_ref.X = scipy.sparse.diags(normalize_sum / adata_ref.obs['n_umi'].values) @ adata_ref.X
+
+# %% [markdown]
+# Next, we run PCA, and then perform Linear Discriminant Analysis on the PCs and celltype labels. This will be the embedding space we use for `quickbeam`.
 
 # %%
 sc.pp.pca(adata_ref, n_comps=100)
 
-# %%
 # since the PCA is zero-centered, we need to save the gene-wise means
 # to apply PCA rotation to pseudobulks
 gene_means = adata_ref.X.mean(axis=0)
 gene_means = np.squeeze(np.asarray(gene_means))
 adata_ref.var['x_mean'] = gene_means
 
-# %%
 lda = LinearDiscriminantAnalysis(n_components=15)
 
 X = adata_ref.obsm['X_pca']
@@ -80,32 +99,56 @@ lda.fit(X, y)
 
 adata_ref.obsm['X_lda'] = lda.transform(adata_ref.obsm['X_pca'])
 
+# %% [markdown]
+# ## Load and transform (pseudo)bulk data
+#
+# Next, we read in the pseudobulk counts (generated in `preprocessing.py`), and subset to the samples in the validation/test set.
+#
+# We then normalize the counts, and subset to the same genes as the reference single cell set.
+#
+# Then, we apply a linear transformation to map the bulk samples to the embedding space.
+
 # %%
 adata_pseudobulk = ad.read_h5ad("data/pseudobulks.h5ad")
 
-# %%
-adata_pseudobulk.raw = adata_pseudobulk
-sc.pp.normalize_total(adata_pseudobulk, target_sum=normalize_sum)
-
-# %%
-adata_pseudobulk = adata_pseudobulk[:, adata.var.index]
-
-# %%
-X = adata_pseudobulk.X - adata_ref.var['x_mean'].values
-X = np.asarray(X @ adata_ref.varm['PCs'])
-adata_pseudobulk.obsm['X_pca'] = X
-adata_pseudobulk.obsm['X_lda'] = lda.transform(X)
-
-# %%
+# Subset to validation set
 keep = adata_pseudobulk.obs['study'] == validation_study
 adata_pseudobulk = adata_pseudobulk[keep,:]
 
+# Normalize on the same scale as the single cell reference set
+adata_pseudobulk.raw = adata_pseudobulk
+sc.pp.normalize_total(adata_pseudobulk, target_sum=normalize_sum)
+
+# Subset to same genes as the single cell reference set
+adata_pseudobulk = adata_pseudobulk[:, adata.var.index]
+
+# Apply PCA rotation to pseudobulks
+X = adata_pseudobulk.X - adata_ref.var['x_mean'].values
+X = np.asarray(X @ adata_ref.varm['PCs'])
+adata_pseudobulk.obsm['X_pca'] = X
+# Apply LDA rotation to pseudobulks
+adata_pseudobulk.obsm['X_lda'] = lda.transform(X)
+
+# %% [markdown]
+# ## Estimate weights for read-level abundances
+#
+# Now that the single cell reference set and the bulk samples are in the same embedding space, we can estimate the weights with `quickbeam`.
 
 # %%
 w_umi = qb.estimate_weights_multisample(adata_ref.obsm['X_lda'],
                                         adata_pseudobulk.obsm['X_lda'])
 
+# %% [markdown]
+# ## Convert read-level abundance to cell-level abundance
+#
+# Note that the gene counts of bulk samples don't normalize for the fact that different cell types have different number of reads. Therefore, the weights represent a probability distribution of a random _read_ drawn from the bulk sample, rather than a probability distribution over a random _cell_ from the bulk sample.
+#
+# We can convert the read-level weights to cell-level weights by estimating size factors for each of the reference cells, and normalizing the weights by those.
+#
+# If the reference set doesn't have too much technical variation, then we can just use the number of UMIs per cell as the normalizing factor. However, the HLCA is a highly heterogeneous dataset, consisting of many samples from different studies, sequenced to different depths, and containing different celltypes. Therefore, we need to control for sample when estimating the size factors. `quickbeam` provides a method to estimate size factors while controlling for sample by using Poisson regression.
+
 # %%
+# Estimate size factors using Poisson regression
 size_factors = qb.estimate_size_factors(
     adata_ref.obsm['X_lda'],
     adata_ref.obs['n_umi'].values,
@@ -113,7 +156,13 @@ size_factors = qb.estimate_size_factors(
     #verbose=True
 )
 
+# Convert read-level weights to cell-level weights
 w_cell = qb.renormalize_weights(w_umi, size_factors)
+
+# %% [markdown]
+# ## Plot inferred weights
+#
+# Below, we plot the read-level and cell-level weights on the reference UMAP for each of the 5 validation bulk samples.
 
 # %%
 # Dataframe for plotting UMI-level weights on UMAP
@@ -134,7 +183,8 @@ df['weight_trunc'] = weight_trunc
 (gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight_trunc")) +
     gg.geom_point(size=.25, alpha=.5) +
     gg.facet_wrap("~sample") +
-    gg.scale_color_cmap(trans=scales.log_trans(base=10)))
+    gg.scale_color_cmap(trans=scales.log_trans(base=10)) +
+    gg.ggtitle("Read-level weights"))
 
  # %%
  # Dataframe for plotting cell-level weights on UMAP
@@ -155,19 +205,24 @@ df['weight_trunc'] = weight_trunc
 (gg.ggplot(df, gg.aes(x="UMAP1", y="UMAP2", color="weight_trunc")) +
     gg.geom_point(size=.25, alpha=.5) +
     gg.facet_wrap("~sample") +
-    gg.scale_color_cmap(trans=scales.log_trans(base=10)))
+    gg.scale_color_cmap(trans=scales.log_trans(base=10)) +
+    gg.ggtitle("Cell-level weights"))
 
-# %%
-adata_ref.obs['size_factor'] = size_factors
-adata_ref.obs['size_factor_log10'] = np.log10(size_factors)
-
-sc.pl.umap(adata_ref, color=['size_factor', 'size_factor_log10'])
+# %% [markdown]
+# ## Plot true vs estimated abundances
+#
+# Next, we compare the estimated weights to the true celltype proportions. In the preprocessing script, we precomputed the fraction of reads and cells coming from each celltype, at different levels of celltype annotation. We read in these precomputed abundances below.
 
 # %%
 df_abundance = pd.read_csv('data/abundances.csv')
+# filter to samples in the validation set
 df_abundance = df_abundance[df_abundance['sample'].isin(adata_pseudobulk.obs.index)]
+# convert sample name to string to prevent missing categorical levels
 df_abundance['sample'] = df_abundance['sample'].astype(str)
 df_abundance
+
+# %% [markdown]
+# Next, we compute estimated celltype abundances, by summing over the weights fit by `quickbeam`. We add the estimated number of reads and cells coming from each celltype to the dataframe of abundances.
 
 # %%
 est_frac_umi = []
@@ -208,6 +263,11 @@ df_abundance['est_frac_cell'] = concat_aggregated_weights(est_frac_cells)
 
 df_abundance
 
+# %% [markdown]
+# Finally, we plot the estimated vs actual abundances, at both the read and cell level.
+#
+# At the finest resolution (annotation level 5), there is some inaccuracy because a common celltype in the validation set (CCL3+ Alveolar macrophages) is very rare in the reference samples, and cannot be distinguished from other Alveolar macrophages in the embedding space. See the manuscript for more details.
+
  # %%
  (gg.ggplot(df_abundance.sample(frac=1, random_state=42), 
            gg.aes(x="frac_umi", y="est_frac_umi", color="ann_level", shape="sample")) +
@@ -215,7 +275,8 @@ df_abundance
     gg.geom_abline(linetype='dashed') +
     gg.scale_x_sqrt(breaks=[.01,.1,.2,.4,.6,.8]) +
     gg.scale_y_sqrt(breaks=[.01,.1,.2,.4,.6,.8]) +
-    gg.theme_bw(base_size=16))
+    gg.theme_bw(base_size=16) +
+    gg.ggtitle("Read-level accuracy"))
 
  # %%
  (gg.ggplot(df_abundance.sample(frac=1, random_state=42), 
@@ -224,7 +285,5 @@ df_abundance
     gg.geom_abline(linetype='dashed') +
     gg.scale_x_sqrt(breaks=[.01,.1,.2,.4,.6,.8]) +
     gg.scale_y_sqrt(breaks=[.01,.1,.2,.4,.6,.8]) +
-    gg.theme_bw(base_size=16))
-
-# %%
-# TODO Add explanatory text (e.g. about the alveolar macrophages)
+    gg.theme_bw(base_size=16) +
+    gg.ggtitle("Cell-level accuracy"))
