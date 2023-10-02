@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
-import quickbeam as qb
+import quipcell as qb
 
 mu1 = np.array([1,0])
 mu2 = np.array([0,1])

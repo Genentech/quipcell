@@ -1,4 +1,4 @@
-# Readme for quickbeam vignette
+# Readme for quipcell vignette
 
 Download the h5ad for the HLCA core dataset from:
 

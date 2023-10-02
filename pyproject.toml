@@ -1,5 +1,5 @@
 [project]
-name = "quickbeam"
+name = "quipcell"
 version = "0.0.1"
 dependencies = [
     #"requests",

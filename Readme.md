@@ -1,4 +1,4 @@
-# quickbeam
+# quipcell
 
 Generalized Cross Entropy method for differential abundance and bulk
 deconvolution in single cell data.

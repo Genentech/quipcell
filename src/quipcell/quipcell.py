@@ -25,7 +25,7 @@ def estimate_weights_multisample(
 
     Returns a numpy array with rows=cells, columns=samples.
 
-    ``**kwargs`` are passed onto :meth:`quickbeam.estimate_weights`.
+    ``**kwargs`` are passed onto :meth:`quipcell.estimate_weights`.
 
     :param `numpy.ndarray` X: Reference embedding. Rows=cells, columns=features.
     :param `numpy.ndarray` mu_multisample: Sample moments. Either bulk gene counts (for bulk deconvolution) or sample centroids of single cells (for differential abundance). Rows=samples, columns=features.
@@ -125,7 +125,7 @@ def renormalize_weights(weights, size_factors):
     This can be used to convert read-level probability weights to
     cell-level weights.
 
-    :param `numpy.ndarray` weights: Weights as returned by `quickbeam.estimate_weights_multisample`. Rows=cells, columns=samples.
+    :param `numpy.ndarray` weights: Weights as returned by `quipcell.estimate_weights_multisample`. Rows=cells, columns=samples.
     :param `numpy.ndarray` size_factors: Cell-level size factors. Should be 1 dimensional, with length equal to the number of rows in `weights`.
 
     :rtype: :class:`numpy.ndarray`

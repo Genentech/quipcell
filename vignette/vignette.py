@@ -6,17 +6,17 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.15.1
+#       jupytext_version: 1.15.2
 #   kernelspec:
-#     display_name: quickbeam
+#     display_name: quipcell
 #     language: python
-#     name: quickbeam
+#     name: quipcell
 # ---
 
 # %% [markdown]
-# # Example application of quickbeam to bulk deconvolution
+# # Example application of quipcell to bulk deconvolution
 #
-# In this vignette, we demonstrate the application of `quickbeam` to bulk deconvolution, replicating some analyses from the manuscript.
+# In this vignette, we demonstrate the application of `quipcell` to bulk deconvolution, replicating some analyses from the manuscript.
 #
 # For our dataset, we use the Human Lung Cell Atlas, which consists of several studies. We hold out one of the studies as a test set, which we use to generate (pseudo)bulk samples with known ground truth.
 
@@ -41,8 +41,7 @@ import scipy.sparse
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.preprocessing import OneHotEncoder
 
-import quickbeam as qb
-import cvxpy as cp
+import quipcell as qpc
 
 # %% [markdown]
 # ## Load single cell data
@@ -79,7 +78,7 @@ normalize_sum = 1000
 adata_ref.X = scipy.sparse.diags(normalize_sum / adata_ref.obs['n_umi'].values) @ adata_ref.X
 
 # %% [markdown]
-# Next, we run PCA, and then perform Linear Discriminant Analysis on the PCs and celltype labels. This will be the embedding space we use for `quickbeam`.
+# Next, we run PCA, and then perform Linear Discriminant Analysis on the PCs and celltype labels. This will be the embedding space we use for `quipcell`.
 
 # %%
 sc.pp.pca(adata_ref, n_comps=100)
@@ -132,11 +131,11 @@ adata_pseudobulk.obsm['X_lda'] = lda.transform(X)
 # %% [markdown]
 # ## Estimate weights for read-level abundances
 #
-# Now that the single cell reference set and the bulk samples are in the same embedding space, we can estimate the weights with `quickbeam`.
+# Now that the single cell reference set and the bulk samples are in the same embedding space, we can estimate the weights with `quipcell`.
 
 # %%
-w_umi = qb.estimate_weights_multisample(adata_ref.obsm['X_lda'],
-                                        adata_pseudobulk.obsm['X_lda'])
+w_umi = qpc.estimate_weights_multisample(adata_ref.obsm['X_lda'],
+                                         adata_pseudobulk.obsm['X_lda'])
 
 # %% [markdown]
 # ## Convert read-level abundance to cell-level abundance
@@ -145,11 +144,11 @@ w_umi = qb.estimate_weights_multisample(adata_ref.obsm['X_lda'],
 #
 # We can convert the read-level weights to cell-level weights by estimating size factors for each of the reference cells, and normalizing the weights by those.
 #
-# If the reference set doesn't have too much technical variation, then we can just use the number of UMIs per cell as the normalizing factor. However, the HLCA is a highly heterogeneous dataset, consisting of many samples from different studies, sequenced to different depths, and containing different celltypes. Therefore, we need to control for sample when estimating the size factors. `quickbeam` provides a method to estimate size factors while controlling for sample by using Poisson regression.
+# If the reference set doesn't have too much technical variation, then we can just use the number of UMIs per cell as the normalizing factor. However, the HLCA is a highly heterogeneous dataset, consisting of many samples from different studies, sequenced to different depths, and containing different celltypes. Therefore, we need to control for sample when estimating the size factors. `quipcell` provides a method to estimate size factors while controlling for sample by using Poisson regression.
 
 # %%
 # Estimate size factors using Poisson regression
-size_factors = qb.estimate_size_factors(
+size_factors = qpc.estimate_size_factors(
     adata_ref.obsm['X_lda'],
     adata_ref.obs['n_umi'].values,
     adata_ref.obs['sample'].values,
@@ -157,7 +156,7 @@ size_factors = qb.estimate_size_factors(
 )
 
 # Convert read-level weights to cell-level weights
-w_cell = qb.renormalize_weights(w_umi, size_factors)
+w_cell = qpc.renormalize_weights(w_umi, size_factors)
 
 # %% [markdown]
 # ## Plot inferred weights
@@ -222,7 +221,7 @@ df_abundance['sample'] = df_abundance['sample'].astype(str)
 df_abundance
 
 # %% [markdown]
-# Next, we compute estimated celltype abundances, by summing over the weights fit by `quickbeam`. We add the estimated number of reads and cells coming from each celltype to the dataframe of abundances.
+# Next, we compute estimated celltype abundances, by summing over the weights fit by `quipcell`. We add the estimated number of reads and cells coming from each celltype to the dataframe of abundances.
 
 # %%
 est_frac_umi = []
