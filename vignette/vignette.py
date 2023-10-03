@@ -19,6 +19,8 @@
 # In this vignette, we demonstrate the application of `quipcell` to bulk deconvolution, replicating some analyses from the manuscript.
 #
 # For our dataset, we use the Human Lung Cell Atlas, which consists of several studies. We hold out one of the studies as a test set, which we use to generate (pseudo)bulk samples with known ground truth.
+#
+# To make this analysis runnable on a laptop, the data has been preprocessed into a smaller form (just the raw counts of the highly variable genes). See the [vignette readme](Readme.md) for instructions on how to download or generate the preprocessed data before running this notebook.
 
 # %%
 from collections import Counter
@@ -46,7 +48,7 @@ import quipcell as qpc
 # %% [markdown]
 # ## Load single cell data
 #
-# First, we load the Human Lung Cell Atlas. To make this runnable on a laptop, this has been subset to the raw counts of the highly variable genes only (see `preprocessing.py`).
+# First, we load the (preprocessed) Human Lung Cell Atlas data.
 
 # %%
 adata = ad.read_h5ad("data/hlca_hvgs.h5ad")
