@@ -1,7 +1,7 @@
 # quipcell
 
-Generalized Cross Entropy method for differential abundance and bulk
-deconvolution in single cell data.
+Quadratic program for differential abundance and bulk deconvolution
+based on Generalized Cross Entropy.
 
 ## Installation
 
