@@ -63,7 +63,12 @@ def estimate_weights_multisample(
 
 # TODO: Add accelerated projected gradient descent solver? E.g. see:
 # https://stackoverflow.com/questions/65526377/cvxpy-returns-infeasible-inaccurate-on-quadratic-programming-optimization-proble
-def estimate_weights(X, mu, quad_form=True, solve_kwargs=None):
+
+# TODO: Add support for general f-divergences? See:
+# https://github.com/cvxpy/cvxpy/issues/420
+
+def estimate_weights(X, mu, quad_form=True, solve_kwargs=None,
+                     method='pearson'):
     """Estimate density weights for a single sample on a single-cell reference.
 
     :param `numpy.ndarray` X: Reference embedding. Rows=cells, columns=features.
@@ -92,13 +97,18 @@ def estimate_weights(X, mu, quad_form=True, solve_kwargs=None):
 
     Xt = X.T
 
-    if quad_form:
-        objective = cp.Minimize(cp.sum_squares(w))
+    if method == 'pearson':
+        if quad_form:
+            objective = cp.Minimize(cp.sum_squares(w))
+        else:
+            # More efficient for conic solvers like ECOS or SCS, but
+            # prevents using QP solvers like OSQP. See also:
+            # http://cvxr.com/cvx/doc/advanced.html#eliminating-quadratic-forms
+            objective = cp.Minimize(cp.norm(w, 2))
+    elif method == 'shannon':
+        objective = cp.Maximize(cp.sum(cp.entr(w)))
     else:
-        # More efficient for conic solvers like ECOS or SCS, but
-        # prevents using QP solvers like OSQP. See also:
-        # http://cvxr.com/cvx/doc/advanced.html#eliminating-quadratic-forms
-        objective = cp.Minimize(cp.norm(w, 2))
+        raise ValueError(f'Invalid method {method}')
 
     prob = cp.Problem(
         objective,
