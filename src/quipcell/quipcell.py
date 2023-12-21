@@ -68,6 +68,7 @@ def estimate_weights_multisample(
 # https://github.com/cvxpy/cvxpy/issues/420
 
 def estimate_weights(X, mu, quad_form=True, solve_kwargs=None,
+                     slack=0,
                      method='pearson'):
     """Estimate density weights for a single sample on a single-cell reference.
 
@@ -110,11 +111,23 @@ def estimate_weights(X, mu, quad_form=True, solve_kwargs=None,
     else:
         raise ValueError(f'Invalid method {method}')
 
+    constraints = [w >= z, cp.sum(w) == 1.0]
+    if slack == 0:
+        constraints.append(
+            Xt @ w == mu,
+        )
+    else:
+        constraints.append(
+            Xt @ w - mu <= slack
+        )
+
+        constraints.append(
+            Xt @ w - mu >= -slack
+        )
+
     prob = cp.Problem(
         objective,
-        [w >= z,
-         Xt @ w == mu,
-         cp.sum(w) == 1.0]
+        constraints
     )
 
     res = prob.solve(**solve_kwargs)
