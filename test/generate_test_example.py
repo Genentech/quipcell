@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 import numpy as np
-import quipcell as qb
+import cvxpy as cp
+import quipcell as qpc
 
 mu1 = np.array([1,0])
 mu2 = np.array([0,1])
@@ -24,17 +25,58 @@ x2 = mu2 + sigma * rng.normal(size=(n, 2))
 
 x = np.vstack([x1, x2])
 
-w = qb.estimate_weights_multisample(x, mu)
+# Explicitly specify solver b/c cvxpy may change default solvers,
+# e.g. in 1.5 clarabel will become default for many problems
 
-assert np.allclose(w.sum(axis=0), 1)
+w = qpc.estimate_weights_multisample(
+    x, mu,
+    solve_kwargs={'solver': cp.OSQP}
+)
 
-assert np.all(n*w[:n, 0] < .85) and np.all(n*w[:n, 0] > .65)
-assert np.all(n*w[n:, 0] < .35) and np.all(n*w[n:, 0] > .15)
+w_relax = qpc.estimate_weights_multisample(
+    x, mu, relax_moment_condition=0.001,
+    solve_kwargs={'solver': cp.OSQP}
+)
 
-assert np.all(n*w[:,1] > .4) and np.all(n*w[:,1] < .6)
+w_norm = qpc.estimate_weights_multisample(
+    x, mu, use_norm=True,
+    solve_kwargs={'solver': cp.ECOS}
+)
 
-assert np.all(n*w[:n, 2] < .25) and np.all(n*w[n:, 2] > .8)
+w3 = qpc.estimate_weights_multisample(
+    x, mu, alpha=3,
+    solve_kwargs={'solver': cp.ECOS}
+)
+
+w_kl = qpc.estimate_weights_multisample(
+    x, mu, alpha='kl',
+    solve_kwargs={'solver': cp.ECOS}
+)
+
+def check_weights_reasonable(w):
+    assert np.allclose(w.sum(axis=0), 1)
+
+    assert np.all(n*w[:n, 0] < .85) and np.all(n*w[:n, 0] > .65)
+    assert np.all(n*w[n:, 0] < .35) and np.all(n*w[n:, 0] > .15)
+
+    assert np.all(n*w[:,1] > .4) and np.all(n*w[:,1] < .6)
+
+    assert np.all(n*w[:n, 2] < .25) and np.all(n*w[n:, 2] > .8)
+
+check_weights_reasonable(w)
+check_weights_reasonable(w_relax)
+check_weights_reasonable(w_norm)
+
+#check_weights_reasonable(w3)
+assert np.max(np.abs(w3 - w)) < .01
+
+#check_weights_reasonable(w_kl)
+assert np.max(np.abs(w_kl - w)) < .012
 
 np.savetxt("test_example_mu.txt", mu)
 np.savetxt("test_example_x.txt", x)
 np.savetxt("test_example_w.txt", w)
+np.savetxt("test_example_w_relaxed.txt", w_relax)
+np.savetxt("test_example_w_norm.txt", w_norm)
+np.savetxt("test_example_w_alpha3.txt", w3)
+np.savetxt("test_example_w_kl.txt", w_kl)
