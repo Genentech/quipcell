@@ -73,7 +73,7 @@ def estimate_weights(X, mu, use_norm=False, solve_kwargs=None,
 
     :param `numpy.ndarray` X: Reference embedding. Rows=cells, columns=features.
     :param `numpy.ndarray` mu: Sample moments. Either bulk gene counts (for bulk deconvolution) or sample centroids of single cells (for differential abundance). Should be a 1-dimensional array.
-    :param bool use_norm: Whether to optimize the pnorm sum(w**alpha)**(1/alpha) instead of sum(w**alpha). While mathematically equivalent when alpha > 0, the conditioning of the optimization problem may be better with pnorm objective. However, it prevents use efficient quadratic optimization solvers when alpha=2. See here for discussion: http://cvxr.com/cvx/doc/advanced.html#eliminating-quadratic-forms
+    :param bool use_norm: Whether to optimize the pnorm sum(w**alpha)**(1/alpha) instead of sum(w**alpha). While mathematically equivalent when alpha > 1, the conditioning of the optimization problem may be better with pnorm objective. However, it prevents using efficient quadratic optimization solvers when alpha=2. See here for discussion: http://cvxr.com/cvx/doc/advanced.html#eliminating-quadratic-forms
     :param float alpha: Value of alpha for alpha-divergence. Also accepts 'pearson' for alpha=2 (which is a quadratic program) or 'kl' for alpha=1 (which is same as maximum entropy).
     :param float relax_moment_condition: For moment constraints, require solution to be within this distance of the data moments. Default is 0, which means to require the moments to match exactly.
     :param dict solve_kwargs: Additional kwargs to pass to `cvxpy.Problem.solve`.
@@ -106,16 +106,19 @@ def estimate_weights(X, mu, use_norm=False, solve_kwargs=None,
     elif type(alpha) == str:
         raise ValueError(f'Unrecognized divergence {alpha}')
 
-    if alpha == 1:
-        objective = cp.Maximize(cp.sum(cp.entr(w)))
-    elif use_norm:
-        if alpha < 1:
-            raise ValueError('Objective is non-convex for pnorm with alpha < 1')
+    if use_norm:
+        if alpha <= 1:
+            raise ValueError('use_norm requires alpha > 1')
         objective = cp.Minimize(cp.norm(w, alpha))
+    elif alpha == 1:
+        objective = cp.Maximize(cp.sum(cp.entr(w)))
+    elif alpha == 0:
+        objective = cp.Maximize(cp.sum(cp.log(w)))
     elif alpha == 2:
         objective = cp.Minimize(cp.sum_squares(w))
-    elif alpha < 1 and alpha >= 0:
-        raise ValueError('alpha-divergence is non-convex when 0 <= alpha < 1')
+    elif alpha < 1 and alpha > 0:
+        # sign of alpha*(alpha-1) is negative in this case
+        objective = cp.Maximize(cp.sum(w**alpha))
     else:
         objective = cp.Minimize(cp.sum(w**alpha))
 
