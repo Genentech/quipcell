@@ -8,5 +8,6 @@ dependencies = [
     "pandas",
     "scikit-learn",
     "cvxpy",
+    "jax",
     'importlib-metadata; python_version>="3.8"',
 ]

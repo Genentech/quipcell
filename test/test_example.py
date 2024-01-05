@@ -7,6 +7,8 @@ import numpy as np
 import cvxpy as cp
 import quipcell as qpc
 
+import quipcell.maxent_dual_lbfgs as maxent_dual_lbfgs
+
 dirname = os.path.dirname(os.path.realpath(__file__))
 
 def test_example():
@@ -123,3 +125,52 @@ def test_example_kl():
     )
 
     assert np.allclose(w, w2)
+
+def test_maxent_dual_lbfgs_eq():
+    x = np.loadtxt(os.path.join(
+        dirname,
+        'test_example_x.txt'
+    ))
+
+    mu = np.loadtxt(os.path.join(
+        dirname,
+        'test_example_mu.txt'
+    ))
+
+    w = qpc.estimate_weights_multisample(
+        x, mu, alpha='kl',
+        solve_kwargs={'solver': cp.ECOS}
+    )
+
+    w2 = qpc.estimate_weights_multisample(
+        x, mu, alpha='kl',
+        use_dual_lbfgs=True
+    )
+
+    assert np.allclose(w, w2, atol=1e-5)
+
+
+def test_maxent_dual_lbfgs_ineq():
+    x = np.loadtxt(os.path.join(
+        dirname,
+        'test_example_x.txt'
+    ))
+
+    mu = np.loadtxt(os.path.join(
+        dirname,
+        'test_example_mu.txt'
+    ))
+
+    w = qpc.estimate_weights_multisample(
+        x, mu, alpha='kl',
+        relax_moment_condition=.01,
+        solve_kwargs={'solver': cp.ECOS}
+    )
+
+    w2 = qpc.estimate_weights_multisample(
+        x, mu, alpha='kl',
+        relax_moment_condition=.01,
+        use_dual_lbfgs=True
+    )
+
+    assert np.allclose(w, w2, atol=1e-5)
