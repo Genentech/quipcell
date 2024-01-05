@@ -12,6 +12,8 @@ import cvxpy as cp
 from sklearn import linear_model
 from sklearn.preprocessing import OneHotEncoder
 
+from .maxent_dual_lbfgs import estimate_weights_maxent_dual_lbfgs
+
 logger = logging.getLogger(__name__)
 
 # TODO: parametrize the cvxpy.Problem by mu to reduce compilation times?
@@ -19,6 +21,8 @@ logger = logging.getLogger(__name__)
 def estimate_weights_multisample(
         X, mu_multisample,
         renormalize=True,
+        alpha='pearson',
+        use_dual_lbfgs=False,
         **kwargs
 ):
     """Estimate density weights for multiple samples on a single-cell reference.
@@ -30,6 +34,8 @@ def estimate_weights_multisample(
     :param `numpy.ndarray` X: Reference embedding. Rows=cells, columns=features.
     :param `numpy.ndarray` mu_multisample: Sample moments. Either bulk gene counts (for bulk deconvolution) or sample centroids of single cells (for differential abundance). Rows=samples, columns=features.
     :param bool renormalize: Correct for any solver inaccuracies by setting small negative numbers to 0, and renormalizing sums to 1.
+    :param float alpha: Value of alpha for alpha-divergence. Also accepts 'pearson' for alpha=2 (which is a quadratic program) or 'kl' for alpha=1 (which is same as maximum entropy).
+    :param bool use_dual_lbfgs: If True, solve via the dual problem with L-BFGS-B, instead of using cvxpy. Only implemented for alpha==1 or alpha=='kl'.
 
     :rtype: :class:`numpy.ndarray`
     """
@@ -39,15 +45,24 @@ def estimate_weights_multisample(
 
     n = mu_multisample.shape[0]
     for i in range(n):
-        prob = estimate_weights(X, mu_multisample[i,:],
-                                **kwargs)
+        if use_dual_lbfgs and (alpha == 1 or alpha == 'kl'):
+            res = estimate_weights_maxent_dual_lbfgs(
+                X, mu_multisample[i,:],
+                **kwargs
+            )
 
-        w_hat, = prob.variables()
-        w_hat = w_hat.value.copy()
+            w_hat = res['primal']
+        else:
+            prob = estimate_weights(X, mu_multisample[i,:],
+                                    alpha=alpha,
+                                    **kwargs)
 
-        # Reference for problem statuses:
-        # https://www.cvxpy.org/tutorial/intro/index.html#other-problem-statuses
-        logger.info(f"i={i}, objective={prob.value}, {prob.status}")
+            # Reference for problem statuses:
+            # https://www.cvxpy.org/tutorial/intro/index.html#other-problem-statuses
+            logger.info(f"i={i}, objective={prob.value}, {prob.status}")
+
+            w_hat, = prob.variables()
+            w_hat = w_hat.value.copy()
 
         w_hat_multisample.append(w_hat)
 
@@ -64,11 +79,8 @@ def estimate_weights_multisample(
 # TODO: Add accelerated projected gradient descent solver? E.g. see:
 # https://stackoverflow.com/questions/65526377/cvxpy-returns-infeasible-inaccurate-on-quadratic-programming-optimization-proble
 
-# TODO: Add support for general f-divergences? See:
-# https://github.com/cvxpy/cvxpy/issues/420
-
-def estimate_weights(X, mu, use_norm=False, solve_kwargs=None,
-                     alpha='pearson', relax_moment_condition=0):
+def estimate_weights(X, mu, use_norm=False, alpha='pearson',
+                     relax_moment_condition=0, solve_kwargs=None):
     """Estimate density weights for a single sample on a single-cell reference.
 
     :param `numpy.ndarray` X: Reference embedding. Rows=cells, columns=features.
@@ -78,7 +90,7 @@ def estimate_weights(X, mu, use_norm=False, solve_kwargs=None,
     :param float relax_moment_condition: For moment constraints, require solution to be within this distance of the data moments. Default is 0, which means to require the moments to match exactly.
     :param dict solve_kwargs: Additional kwargs to pass to `cvxpy.Problem.solve`.
 
-    :rtype: :class:`numpy.ndarray`
+    :rtype: :class:`cvxpy.Problem`
     """
     # Reference for solver options:
     # https://www.cvxpy.org/tutorial/advanced/index.html#setting-solver-options
