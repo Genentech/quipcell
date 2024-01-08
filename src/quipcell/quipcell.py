@@ -52,6 +52,9 @@ def estimate_weights_multisample(
             )
 
             w_hat = res['primal']
+            logger.info(
+                f"i={i}, objective={res['dual_opt_res']['fun']}, {res['dual_opt_res']['message']}"
+            )
         else:
             prob = estimate_weights(X, mu_multisample[i,:],
                                     alpha=alpha,
