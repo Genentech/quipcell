@@ -50,16 +50,15 @@ def maxent_solve_dual_lbfgs(A, b, n_inequality, opt_kwargs=None):
 
 def estimate_weights_maxent_dual_lbfgs(
         X, mu,
-        relax_moment_condition=0,
+        mom_atol=0, mom_rtol=0,
         opt_kwargs=None
 ):
-    eps = relax_moment_condition
-    # TODO Handle non-scalar eps
-    if eps == 0:
+    if mom_atol == 0 and mom_rtol == 0:
         A = -X.T
         b = -mu
         n_inequality = 0
     else:
+        eps = mom_atol + mom_rtol * jnp.abs(mu)
         A = jnp.vstack([X.T, -X.T])
         b = jnp.concatenate([mu+eps, -mu+eps])
         n_inequality = A.shape[0]

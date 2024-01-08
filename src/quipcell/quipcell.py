@@ -80,14 +80,15 @@ def estimate_weights_multisample(
 # https://stackoverflow.com/questions/65526377/cvxpy-returns-infeasible-inaccurate-on-quadratic-programming-optimization-proble
 
 def estimate_weights(X, mu, use_norm=False, alpha='pearson',
-                     relax_moment_condition=0, solve_kwargs=None):
+                     mom_atol=0, mom_rtol=0, solve_kwargs=None):
     """Estimate density weights for a single sample on a single-cell reference.
 
     :param `numpy.ndarray` X: Reference embedding. Rows=cells, columns=features.
     :param `numpy.ndarray` mu: Sample moments. Either bulk gene counts (for bulk deconvolution) or sample centroids of single cells (for differential abundance). Should be a 1-dimensional array.
     :param bool use_norm: Whether to optimize the pnorm sum(w**alpha)**(1/alpha) instead of sum(w**alpha). While mathematically equivalent when alpha > 1, the conditioning of the optimization problem may be better with pnorm objective. However, it prevents using efficient quadratic optimization solvers when alpha=2. See here for discussion: http://cvxr.com/cvx/doc/advanced.html#eliminating-quadratic-forms
     :param float alpha: Value of alpha for alpha-divergence. Also accepts 'pearson' for alpha=2 (which is a quadratic program) or 'kl' for alpha=1 (which is same as maximum entropy).
-    :param float relax_moment_condition: For moment constraints, require solution to be within this distance of the data moments. Default is 0, which means to require the moments to match exactly.
+    :param float mom_atol: For moment constraints, require X.T @ w = mu +/- eps, where eps = mom_atol + abs(mu) * mom_rtol.
+    :param float mom_rtol: For moment constraints, require X.T @ w = mu +/- eps, where eps = mom_atol + abs(mu) * mom_rtol.
     :param dict solve_kwargs: Additional kwargs to pass to `cvxpy.Problem.solve`.
 
     :rtype: :class:`cvxpy.Problem`
@@ -135,17 +136,18 @@ def estimate_weights(X, mu, use_norm=False, alpha='pearson',
         objective = cp.Minimize(cp.sum(w**alpha))
 
     constraints = [w >= z, cp.sum(w) == 1.0]
-    if relax_moment_condition == 0:
+    if mom_atol == 0 and mom_rtol == 0:
         constraints.append(
             Xt @ w == mu,
         )
     else:
+        eps = mom_atol + mom_rtol * np.abs(mu)
         constraints.append(
-            Xt @ w - mu <= relax_moment_condition
+            Xt @ w - mu <= eps
         )
 
         constraints.append(
-            Xt @ w - mu >= -relax_moment_condition
+            Xt @ w - mu >= -eps
         )
 
     prob = cp.Problem(
