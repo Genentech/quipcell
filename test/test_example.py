@@ -51,7 +51,30 @@ def test_example_relaxed():
     ))
 
     w2 = qpc.estimate_weights_multisample(
-        x, mu, relax_moment_condition=.001,
+        x, mu, mom_atol=.001,
+        solve_kwargs={'solver': cp.OSQP}
+    )
+
+    assert np.allclose(w, w2)
+
+def test_example_relaxed2():
+    w = np.loadtxt(os.path.join(
+        dirname,
+        'test_example_w_relaxed2.txt'
+    ))
+
+    x = np.loadtxt(os.path.join(
+        dirname,
+        'test_example_x.txt'
+    ))
+
+    mu = np.loadtxt(os.path.join(
+        dirname,
+        'test_example_mu.txt'
+    ))
+
+    w2 = qpc.estimate_weights_multisample(
+        x, mu, mom_rtol=.1,
         solve_kwargs={'solver': cp.OSQP}
     )
 
@@ -163,13 +186,13 @@ def test_maxent_dual_lbfgs_ineq():
 
     w = qpc.estimate_weights_multisample(
         x, mu, alpha='kl',
-        relax_moment_condition=.01,
+        mom_atol=.01,
         solve_kwargs={'solver': cp.ECOS}
     )
 
     w2 = qpc.estimate_weights_multisample(
         x, mu, alpha='kl',
-        relax_moment_condition=.01,
+        mom_atol=.01,
         use_dual_lbfgs=True
     )
 

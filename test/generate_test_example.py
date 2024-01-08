@@ -34,7 +34,12 @@ w = qpc.estimate_weights_multisample(
 )
 
 w_relax = qpc.estimate_weights_multisample(
-    x, mu, relax_moment_condition=0.001,
+    x, mu, mom_atol=0.001,
+    solve_kwargs={'solver': cp.OSQP}
+)
+
+w_relax2 = qpc.estimate_weights_multisample(
+    x, mu, mom_rtol=0.1,
     solve_kwargs={'solver': cp.OSQP}
 )
 
@@ -67,6 +72,9 @@ check_weights_reasonable(w)
 check_weights_reasonable(w_relax)
 check_weights_reasonable(w_norm)
 
+#check_weights_reasonable(w_relax2)
+assert np.max(np.abs(w_relax2 - w)) < .01
+
 #check_weights_reasonable(w3)
 assert np.max(np.abs(w3 - w)) < .01
 
@@ -77,6 +85,7 @@ np.savetxt("test_example_mu.txt", mu)
 np.savetxt("test_example_x.txt", x)
 np.savetxt("test_example_w.txt", w)
 np.savetxt("test_example_w_relaxed.txt", w_relax)
+np.savetxt("test_example_w_relaxed2.txt", w_relax2)
 np.savetxt("test_example_w_norm.txt", w_norm)
 np.savetxt("test_example_w_alpha3.txt", w3)
 np.savetxt("test_example_w_kl.txt", w_kl)
