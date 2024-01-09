@@ -45,7 +45,7 @@ class AlphaDivergenceCvxpySolver(GeneralizedDivergenceSolver):
         :param float mom_atol: For moment constraints, require X.T @ w = mu +/- eps, where eps = mom_atol + abs(mu) * mom_rtol.
         :param float mom_rtol: For moment constraints, require X.T @ w = mu +/- eps, where eps = mom_atol + abs(mu) * mom_rtol.
         :param dict solve_kwargs: Additional kwargs to pass to `cvxpy.Problem.solve`.
-        :param bool use_norm: Whether to optimize the pnorm sum(w**alpha)**(1/alpha) instead of sum(w**alpha). While mathematically equivalent when alpha > 1, the conditioning of the optimization problem may be better with pnorm objective. However, it prevents using efficient quadratic optimization solvers when alpha=2. See here for discussion: http://cvxr.com/cvx/doc/advanced.html#eliminating-quadratic-forms
+        :param bool use_norm: Replaces the f-divergence with a monotone transformation that may have better conditioning. Specifically, optimizes sum((n*w)**alpha)**(1/alpha) - n**(1/alpha). Note it prevents using efficient QP solvers when alpha=2. Requires alpha>1.
         """
         if alpha == 'pearson':
             alpha = 2
@@ -178,24 +178,24 @@ class AlphaDivergenceCvxpySolver(GeneralizedDivergenceSolver):
 
         Xt = X.T
 
-        # TODO Scale the objective to match traditional definition of
-        # alpha divergence? I.e. scale it by 1/alpha(alpha-1) and
-        # subtract a constant. Even tho the optimization problem is
-        # equivalent, the result may be more interpretable using the
-        # traditional scaling.
         if self.use_norm:
-            objective = cp.Minimize(cp.norm(w, self.alpha))
+            assert self.alpha > 1
+            # Minimum at 0 when w is uniform, by Holder's inequality
+            objective = cp.norm(n*w, self.alpha) - n**(1/self.alpha)
+            # NOTE: This claims use_norm is preferable even when alpha=2:
+            # http://cvxr.com/cvx/doc/advanced.html#eliminating-quadratic-forms
+            # But I'm dubious about it -- I think it holds for conic
+            # solvers like ECOS, but not dedicated QP solvers like OSQP
         elif self.alpha == 1:
-            objective = cp.Minimize(-cp.sum(cp.entr(w)))
+            objective = -cp.sum(cp.entr(w))
         elif self.alpha == 0:
-            objective = cp.Minimize(-cp.sum(cp.log(w)))
-        elif self.alpha == 2:
-            objective = cp.Minimize(cp.sum_squares(w))
-        elif self.alpha < 1 and self.alpha > 0:
-            # sign of alpha*(alpha-1) is negative in this case
-            objective = cp.Minimize(-cp.sum(w**self.alpha))
+            objective = -cp.sum(cp.log(w))
         else:
-            objective = cp.Minimize(cp.sum(w**self.alpha))
+            objective = (
+                cp.sum((n * w)**self.alpha) - n
+            ) / n / self.alpha / (self.alpha-1)
+
+        objective = cp.Minimize(objective)
 
         constraints = [w >= z, cp.sum(w) == 1.0]
 
@@ -242,3 +242,7 @@ class AlphaDivergenceCvxpySolver(GeneralizedDivergenceSolver):
         logger.info(f"objective={prob.value}, {prob.status}")
 
         return prob
+
+# TODO: Implement Vajda's chi-alpha divergence?
+# See the table on the f-divergence wikipedia page.
+# It's equivalent to the Lp-norm of w minus uniform.
