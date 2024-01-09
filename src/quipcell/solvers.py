@@ -72,6 +72,83 @@ class AlphaDivergenceCvxpySolver(GeneralizedDivergenceSolver):
         
         self.opt_res_list = []
 
+    def dual_nonneg(self):
+        # FIXME Don't make the index manually hardcoded, to prevent
+        # accidental future breakage
+        return np.array([
+            prob.constraints[0].dual_value
+            for prob in self.opt_res_list
+        ])
+
+    def dual_sum1(self):
+        # FIXME Don't make the index manually hardcoded, to prevent
+        # accidental future breakage
+        return np.array([
+            prob.constraints[1].dual_value
+            for prob in self.opt_res_list
+        ])
+
+    def dual_moments(self, direction='both'):
+        if not self.opt_res_list:
+            raise ValueError("Need to call fit() first")
+
+        start = self._dual_n_skip_constraints
+        if self._equality_constraints:
+            vals = []
+            for i in range(len(self.opt_res_list)):
+                vals.append(self.opt_res_list[i].constraints[start].dual_value)
+            vals = np.array(vals)
+
+            if direction == 'both':
+                return vals
+            elif direction == 'upper':
+                # TODO
+                raise NotImplementedError()
+            elif direction == 'lower':
+                # TODO
+                raise NotImplementedError()
+            else:
+                raise ValueError(f"Invalid direction {direction} (typo?)")
+        else:
+            if direction == 'upper':
+                # FIXME Don't make the fact that upper is first
+                # manually hardcoded
+                return np.array([
+                    self.opt_res_list[i].constraints[start].dual_value
+                    for i in range(len(self.opt_res_list))
+                ])
+            elif direction == 'lower':
+                # FIXME Don't make the fact that lower is second
+                # manually hardcoded
+                return np.array([
+                    self.opt_res_list[i].constraints[start+1].dual_value
+                    for i in range(len(self.opt_res_list))
+                ])
+            elif direction == 'both':
+                upper = self.dual_moments(direction='upper')
+                lower = self.dual_moments(direction='lower')
+
+                # This fails to be true when atol/rtol is very small.
+                # Possibly due to numerical instability in that case?
+                #assert np.all(np.isclose(upper, 0) | np.isclose(lower, 0))
+
+                # But the difference seems to remain stable even when
+                # epsilon is very small
+                return upper - lower
+            else:
+                raise ValueError(f"Invalid direction {direction} (typo?)")
+
+    # HACK Hardcoding that the first 2 constraints are the sum-to-1
+    # and non-negative constraints. Assert this when constructing
+    # constraints.
+    @property
+    def _dual_n_skip_constraints(self):
+        return 2
+
+    @property
+    def _equality_constraints(self):
+        return self.mom_atol == 0 and self.mom_rtol == 0
+
     def _weights1sample(self, i):
         """TODO docstring"""
         w_hat, = self.opt_res_list[i].variables()
@@ -121,12 +198,24 @@ class AlphaDivergenceCvxpySolver(GeneralizedDivergenceSolver):
             objective = cp.Minimize(cp.sum(w**self.alpha))
 
         constraints = [w >= z, cp.sum(w) == 1.0]
-        if self.mom_atol == 0 and self.mom_rtol == 0:
+
+        # NOTE Hardcoding that the first 2 constraints are the
+        # non-interesting ones. dual_moments checks this when figuring
+        # which constraint to use
+        assert len(constraints) == self._dual_n_skip_constraints
+        
+        if self._equality_constraints:
             constraints.append(
                 Xt @ w == mu,
             )
         else:
             eps = self.mom_atol + self.mom_rtol * np.abs(mu)
+
+            # NOTE dual_moments assumes the upper constraint is always
+            # first. FIXME Make the ordering of upper/lower more
+            # robust/automatic instead of manually hardcoded. Or at
+            # least add some kind of assertion here!
+            
             constraints.append(
                 Xt @ w - mu <= eps
             )

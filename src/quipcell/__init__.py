@@ -4,3 +4,5 @@ from .quipcell import (
     renormalize_weights,
     estimate_size_factors,
 )
+
+from .solvers import AlphaDivergenceCvxpySolver
