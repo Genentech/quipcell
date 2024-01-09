@@ -7,12 +7,11 @@ import pandas as pd
 
 import scipy.sparse
 
-import cvxpy as cp
-
 from sklearn import linear_model
 from sklearn.preprocessing import OneHotEncoder
 
-from .maxent_dual_lbfgs import estimate_weights_maxent_dual_lbfgs
+from .solvers import AlphaDivergenceCvxpySolver
+from .maxent_dual_lbfgs import MaxentDualLbfgsSolver
 
 logger = logging.getLogger(__name__)
 
@@ -39,136 +38,17 @@ def estimate_weights_multisample(
 
     :rtype: :class:`numpy.ndarray`
     """
+    # FIXME docstring is outdated for **kwargs
+
     start = datetime.now()
 
-    w_hat_multisample = []
-
-    n = mu_multisample.shape[0]
-    for i in range(n):
-        if use_dual_lbfgs and (alpha == 1 or alpha == 'kl'):
-            res = estimate_weights_maxent_dual_lbfgs(
-                X, mu_multisample[i,:],
-                **kwargs
-            )
-
-            w_hat = res['primal']
-            logger.info(
-                f"i={i}, objective={res['dual_opt_res']['fun']}, {res['dual_opt_res']['message']}"
-            )
-        else:
-            prob = estimate_weights(X, mu_multisample[i,:],
-                                    alpha=alpha,
-                                    **kwargs)
-
-            # Reference for problem statuses:
-            # https://www.cvxpy.org/tutorial/intro/index.html#other-problem-statuses
-            logger.info(f"i={i}, objective={prob.value}, {prob.status}")
-
-            w_hat, = prob.variables()
-            w_hat = w_hat.value.copy()
-
-        w_hat_multisample.append(w_hat)
-
-    ret = np.array(w_hat_multisample).T
-    if renormalize:
-        ret[ret < 0] = 0
-        ret = np.einsum("ij,j->ij", ret, 1.0 / ret.sum(axis=0))
-
-    interval = (datetime.now() - start).total_seconds()
-    logger.info(f"Finished {n} samples in {interval} seconds.")
-
-    return ret
-
-# TODO: Add accelerated projected gradient descent solver? E.g. see:
-# https://stackoverflow.com/questions/65526377/cvxpy-returns-infeasible-inaccurate-on-quadratic-programming-optimization-proble
-
-def estimate_weights(X, mu, use_norm=False, alpha='pearson',
-                     mom_atol=0, mom_rtol=0, solve_kwargs=None):
-    """Estimate density weights for a single sample on a single-cell reference.
-
-    :param `numpy.ndarray` X: Reference embedding. Rows=cells, columns=features.
-    :param `numpy.ndarray` mu: Sample moments. Either bulk gene counts (for bulk deconvolution) or sample centroids of single cells (for differential abundance). Should be a 1-dimensional array.
-    :param bool use_norm: Whether to optimize the pnorm sum(w**alpha)**(1/alpha) instead of sum(w**alpha). While mathematically equivalent when alpha > 1, the conditioning of the optimization problem may be better with pnorm objective. However, it prevents using efficient quadratic optimization solvers when alpha=2. See here for discussion: http://cvxr.com/cvx/doc/advanced.html#eliminating-quadratic-forms
-    :param float alpha: Value of alpha for alpha-divergence. Also accepts 'pearson' for alpha=2 (which is a quadratic program) or 'kl' for alpha=1 (which is same as maximum entropy).
-    :param float mom_atol: For moment constraints, require X.T @ w = mu +/- eps, where eps = mom_atol + abs(mu) * mom_rtol.
-    :param float mom_rtol: For moment constraints, require X.T @ w = mu +/- eps, where eps = mom_atol + abs(mu) * mom_rtol.
-    :param dict solve_kwargs: Additional kwargs to pass to `cvxpy.Problem.solve`.
-
-    :rtype: :class:`cvxpy.Problem`
-    """
-    # Reference for solver options:
-    # https://www.cvxpy.org/tutorial/advanced/index.html#setting-solver-options
-    if not solve_kwargs:
-        solve_kwargs = {}
-    solve_kwargs.setdefault("verbose", False)
-
-    n = X.shape[0]
-    z = np.zeros(n)
-
-    w = cp.Variable(n)
-
-    # Initialize as uniform distribution
-    # NOTE: Unclear in which solvers CVXPY will actually use the initialization
-    # https://www.cvxpy.org/tutorial/advanced/index.html#warm-start
-    # https://stackoverflow.com/questions/52314581/initial-guess-warm-start-in-cvxpy-give-a-hint-of-the-solution
-    w.value = np.ones(n) / n
-
-    Xt = X.T
-
-    if alpha == 'pearson':
-        alpha = 2
-    elif alpha == 'kl':
-        alpha = 1
-    elif type(alpha) == str:
-        raise ValueError(f'Unrecognized divergence {alpha}')
-
-    if use_norm:
-        if alpha <= 1:
-            raise ValueError('use_norm requires alpha > 1')
-        objective = cp.Minimize(cp.norm(w, alpha))
-    elif alpha == 1:
-        objective = cp.Maximize(cp.sum(cp.entr(w)))
-    elif alpha == 0:
-        objective = cp.Maximize(cp.sum(cp.log(w)))
-    elif alpha == 2:
-        objective = cp.Minimize(cp.sum_squares(w))
-    elif alpha < 1 and alpha > 0:
-        # sign of alpha*(alpha-1) is negative in this case
-        objective = cp.Maximize(cp.sum(w**alpha))
+    if use_dual_lbfgs and (alpha == 1 or alpha == 'kl'):
+        solver = MaxentDualLbfgsSolver(**kwargs)
     else:
-        objective = cp.Minimize(cp.sum(w**alpha))
+        solver = AlphaDivergenceCvxpySolver(alpha=alpha, **kwargs)
 
-    constraints = [w >= z, cp.sum(w) == 1.0]
-    if mom_atol == 0 and mom_rtol == 0:
-        constraints.append(
-            Xt @ w == mu,
-        )
-    else:
-        eps = mom_atol + mom_rtol * np.abs(mu)
-        constraints.append(
-            Xt @ w - mu <= eps
-        )
-
-        constraints.append(
-            Xt @ w - mu >= -eps
-        )
-
-    prob = cp.Problem(
-        objective,
-        constraints
-    )
-
-    res = prob.solve(**solve_kwargs)
-    assert prob.variables()[0] is w
-    assert prob.value is res
-
-    # TODO: Reenable assertions, with params for atol/rtol?
-    #w_hat, = prob.variables()
-    #w_hat = w_hat.value
-    #assert np.all(np.isclose(w_hat, 0, atol=1e-4) | (w_hat >= 0))
-    #assert np.allclose(np.sum(w_hat), 1)
-
-    return prob
+    solver.fit(X, mu_multisample)
+    return solver.weights(renormalize=renormalize)
 
 def renormalize_weights(weights, size_factors):
     """Renormalize weights to correct for cell-specific size factors.
