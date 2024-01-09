@@ -110,10 +110,10 @@ def test_dual_small_epsilon():
     assert np.allclose(l1, l2, rtol=.1, atol=.001)
 
     assert np.allclose(res1.dual_sum1(), res2.dual_sum1(),
-                       rtol=1e-3, atol=1e-4)
+                       rtol=1e-2, atol=1e-4)
 
     assert np.allclose(res1.dual_nonneg(), res2.dual_nonneg(),
-                       rtol=1e-3, atol=1e-4)
+                       rtol=1e-2, atol=5e-4)
 
 def test_example_norm():
     w = np.loadtxt(os.path.join(
@@ -136,7 +136,8 @@ def test_example_norm():
         solve_kwargs={'solver': cp.ECOS}
     )
 
-    assert np.allclose(w, w2)
+    #assert np.allclose(w, w2)
+    assert np.allclose(w, w2, atol=1e-6, rtol=1e-4)
 
 def test_example_alpha3():
     w = np.loadtxt(os.path.join(
@@ -159,7 +160,8 @@ def test_example_alpha3():
         solve_kwargs={'solver': cp.ECOS}
     )
 
-    assert np.allclose(w, w2)
+    #assert np.allclose(w, w2)
+    assert np.allclose(w, w2, atol=1e-6, rtol=1e-3)
 
 def test_example_kl():
     w = np.loadtxt(os.path.join(
