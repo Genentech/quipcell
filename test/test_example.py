@@ -80,6 +80,41 @@ def test_example_relaxed2():
 
     assert np.allclose(w, w2)
 
+def test_dual_small_epsilon():
+    x = np.loadtxt(os.path.join(
+        dirname,
+        'test_example_x.txt'
+    ))
+
+    mu = np.loadtxt(os.path.join(
+        dirname,
+        'test_example_mu.txt'
+    ))
+
+    res1 = qpc.AlphaDivergenceCvxpySolver(
+        alpha=2, mom_atol=1e-8,
+        solve_kwargs={'solver': cp.OSQP}
+    )
+    res1.fit(x, mu)
+
+    res2 = qpc.AlphaDivergenceCvxpySolver(
+        alpha=2,
+        #mom_atol=.001, mom_rtol=.001,
+        solve_kwargs={'solver': cp.OSQP}
+    )
+    res2.fit(x, mu)
+
+    l2 = res2.dual_moments()
+    l1 = res1.dual_moments()
+
+    assert np.allclose(l1, l2, rtol=.1, atol=.001)
+
+    assert np.allclose(res1.dual_sum1(), res2.dual_sum1(),
+                       rtol=1e-3, atol=1e-4)
+
+    assert np.allclose(res1.dual_nonneg(), res2.dual_nonneg(),
+                       rtol=1e-3, atol=1e-4)
+
 def test_example_norm():
     w = np.loadtxt(os.path.join(
         dirname,
