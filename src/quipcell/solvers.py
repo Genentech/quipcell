@@ -181,7 +181,7 @@ class AlphaDivergenceCvxpySolver(GeneralizedDivergenceSolver):
         if self.use_norm:
             assert self.alpha > 1
             # Minimum at 0 when w is uniform, by Holder's inequality
-            objective = cp.norm(n*w, self.alpha) - n**(1/self.alpha)
+            objective = n * cp.norm(w, self.alpha) - n**(1/self.alpha)
             # NOTE: This claims use_norm is preferable even when alpha=2:
             # http://cvxr.com/cvx/doc/advanced.html#eliminating-quadratic-forms
             # But I'm dubious about it -- I think it holds for conic
@@ -192,8 +192,8 @@ class AlphaDivergenceCvxpySolver(GeneralizedDivergenceSolver):
             objective = -cp.sum(cp.log(w))
         else:
             objective = (
-                cp.sum((n * w)**self.alpha) - n
-            ) / n / self.alpha / (self.alpha-1)
+                n**(self.alpha-1) * cp.sum(w**self.alpha) - 1
+            ) / self.alpha / (self.alpha-1)
 
         objective = cp.Minimize(objective)
 
