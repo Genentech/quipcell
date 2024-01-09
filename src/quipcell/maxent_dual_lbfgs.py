@@ -1,9 +1,14 @@
+import logging
 
 import scipy
 import scipy.optimize
 
 import jax
 import jax.numpy as jnp
+
+from .solvers import GeneralizedDivergenceSolver
+
+logger = logging.getLogger(__name__)
 
 def maxent_dual(lambd, b, A):
     return - b @ lambd - jnp.log(jnp.sum(jnp.exp(- A.T @ lambd)))
@@ -48,21 +53,37 @@ def maxent_solve_dual_lbfgs(A, b, n_inequality, opt_kwargs=None):
         "dual_opt_res": res
     }
 
-def estimate_weights_maxent_dual_lbfgs(
-        X, mu,
-        mom_atol=0, mom_rtol=0,
-        opt_kwargs=None
-):
-    if mom_atol == 0 and mom_rtol == 0:
-        A = -X.T
-        b = -mu
-        n_inequality = 0
-    else:
-        eps = mom_atol + mom_rtol * jnp.abs(mu)
-        A = jnp.vstack([X.T, -X.T])
-        b = jnp.concatenate([mu+eps, -mu+eps])
-        n_inequality = A.shape[0]
+class MaxentDualLbfgsSolver(GeneralizedDivergenceSolver):
+    def __init__(self, mom_atol=0, mom_rtol=0,
+                 solve_kwargs=None):
+        self.mom_atol = mom_atol
+        self.mom_rtol = mom_rtol
 
-    return maxent_solve_dual_lbfgs(A, b, n_inequality,
-                                   opt_kwargs=opt_kwargs)
-        
+        if not solve_kwargs:
+            solve_kwargs = {}
+        self.solve_kwargs = solve_kwargs
+
+        self.opt_res_list = []
+
+    def _weights1sample(self, i):
+        return self.opt_res_list[i]['primal']
+
+    def _fit1sample(self, X, mu):
+        if self.mom_atol == 0 and self.mom_rtol == 0:
+            A = -X.T
+            b = -mu
+            n_inequality = 0
+        else:
+            eps = self.mom_atol + self.mom_rtol * jnp.abs(mu)
+            A = jnp.vstack([X.T, -X.T])
+            b = jnp.concatenate([mu+eps, -mu+eps])
+            n_inequality = A.shape[0]
+
+        res = maxent_solve_dual_lbfgs(A, b, n_inequality,
+                                      opt_kwargs=self.solve_kwargs)
+
+        logger.info(
+            f"objective={res['dual_opt_res']['fun']}, {res['dual_opt_res']['message']}"
+        )
+
+        return res
