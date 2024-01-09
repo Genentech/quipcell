@@ -136,8 +136,8 @@ def test_example_norm():
         solve_kwargs={'solver': cp.ECOS}
     )
 
-    #assert np.allclose(w, w2)
-    assert np.allclose(w, w2, atol=1e-6, rtol=1e-4)
+    assert np.allclose(w, w2)
+    #assert np.allclose(w, w2, atol=1e-6, rtol=1e-4)
 
 def test_example_alpha3():
     w = np.loadtxt(os.path.join(
@@ -160,8 +160,8 @@ def test_example_alpha3():
         solve_kwargs={'solver': cp.ECOS}
     )
 
-    #assert np.allclose(w, w2)
-    assert np.allclose(w, w2, atol=1e-6, rtol=1e-3)
+    assert np.allclose(w, w2)
+    #assert np.allclose(w, w2, atol=1e-6, rtol=1e-3)
 
 def test_example_kl():
     w = np.loadtxt(os.path.join(
