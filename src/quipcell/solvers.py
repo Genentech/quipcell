@@ -187,9 +187,9 @@ class AlphaDivergenceCvxpySolver(GeneralizedDivergenceSolver):
             # But I'm dubious about it -- I think it holds for conic
             # solvers like ECOS, but not dedicated QP solvers like OSQP
         elif self.alpha == 1:
-            objective = -cp.sum(cp.entr(w))
+            objective = -cp.sum(cp.entr(w)) - np.log(n)
         elif self.alpha == 0:
-            objective = -cp.sum(cp.log(w))
+            objective = -cp.sum(cp.log(w)) - n * np.log(n)
         else:
             objective = (
                 n**(self.alpha-1) * cp.sum(w**self.alpha) - 1
