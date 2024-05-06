@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.16.1
 #   kernelspec:
 #     display_name: quipcell
 #     language: python
@@ -243,7 +243,7 @@ for i in range(1, 6):
             columns = enc.categories_[0],
             index = adata_pseudobulk.obs.index
         ).reset_index(names='sample').melt(
-            id_vars=['sample'], var_name=['celltype'], value_name='weight'
+            id_vars=['sample'], var_name='celltype', value_name='weight'
         ).assign(ann_level=f'lvl{i}')
 
     est_frac_umi.append(aggregate_and_reshape(w_umi))
@@ -288,3 +288,5 @@ df_abundance
     gg.scale_y_sqrt(breaks=[.01,.1,.2,.4,.6,.8]) +
     gg.theme_bw(base_size=16) +
     gg.ggtitle("Cell-level accuracy"))
+
+# %%
