@@ -21,7 +21,7 @@ def estimate_weights_multisample(
         X, mu_multisample,
         renormalize=True,
         alpha='pearson',
-        use_dual_lbfgs=False,
+        use_dual_lbfgs=None,
         **kwargs
 ):
     """Estimate density weights for multiple samples on a single-cell reference.
@@ -34,18 +34,22 @@ def estimate_weights_multisample(
     :param `numpy.ndarray` mu_multisample: Sample moments. Either bulk gene counts (for bulk deconvolution) or sample centroids of single cells (for differential abundance). Rows=samples, columns=features.
     :param bool renormalize: Correct for any solver inaccuracies by setting small negative numbers to 0, and renormalizing sums to 1.
     :param float alpha: Value of alpha for alpha-divergence. Also accepts 'pearson' for alpha=2 (which is a quadratic program) or 'kl' for alpha=1 (which is same as maximum entropy).
-    :param bool use_dual_lbfgs: If True, solve via the dual problem with L-BFGS-B, instead of using cvxpy. Only implemented for alpha==1 or alpha=='kl'.
+    :param bool use_dual_lbfgs: If True, solve via the dual problem with L-BFGS-B, instead of using cvxpy. Currently only implemented for alpha==1 or alpha=='kl'. Default is True when alpha==1 or 'kl', and False otherwise.
 
     :rtype: :class:`numpy.ndarray`
     """
-    # FIXME docstring is outdated for **kwargs
 
     start = datetime.now()
 
-    if use_dual_lbfgs and (alpha == 1 or alpha == 'kl'):
+    if use_dual_lbfgs is None:
+        use_dual_lbfgs = (alpha == 1 or alpha == 'kl')
+
+    if not use_dual_lbfgs:
+        solver = AlphaDivergenceCvxpySolver(alpha=alpha, **kwargs)
+    elif alpha == 1 or alpha == 'kl':
         solver = MaxentDualLbfgsSolver(**kwargs)
     else:
-        solver = AlphaDivergenceCvxpySolver(alpha=alpha, **kwargs)
+        raise NotImplementedError("Dual LBFGS solver only implemented for alpha=1")
 
     solver.fit(X, mu_multisample)
     return solver.weights(renormalize=renormalize)

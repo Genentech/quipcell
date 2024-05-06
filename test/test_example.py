@@ -181,6 +181,7 @@ def test_example_kl():
 
     w2 = qpc.estimate_weights_multisample(
         x, mu, alpha='kl',
+        use_dual_lbfgs=False,
         solve_kwargs={'solver': cp.ECOS}
     )
 
@@ -199,12 +200,13 @@ def test_maxent_dual_lbfgs_eq():
 
     w = qpc.estimate_weights_multisample(
         x, mu, alpha='kl',
+        use_dual_lbfgs=False,
         solve_kwargs={'solver': cp.ECOS}
     )
 
     w2 = qpc.estimate_weights_multisample(
         x, mu, alpha='kl',
-        use_dual_lbfgs=True
+        #use_dual_lbfgs=True
     )
 
     assert np.allclose(w, w2, atol=1e-5)
@@ -224,13 +226,14 @@ def test_maxent_dual_lbfgs_ineq():
     w = qpc.estimate_weights_multisample(
         x, mu, alpha='kl',
         mom_atol=.01,
+        use_dual_lbfgs=False,
         solve_kwargs={'solver': cp.ECOS}
     )
 
     w2 = qpc.estimate_weights_multisample(
         x, mu, alpha='kl',
         mom_atol=.01,
-        use_dual_lbfgs=True
+        #use_dual_lbfgs=True
     )
 
     assert np.allclose(w, w2, atol=1e-5)
