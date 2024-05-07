@@ -125,6 +125,9 @@ class AlphaDivergenceCvxpySolver(GeneralizedDivergenceSolver):
                 'dual_upper': upper,
                 'dual_lower': lower
             }
+
+    def _objective(self):
+        return np.array([prob.value for prob in self.opt_res_list])
     
     def _weights1sample(self, i):
         """TODO docstring"""
