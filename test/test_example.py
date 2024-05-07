@@ -202,16 +202,17 @@ def test_maxent_dual_lbfgs_eq():
         x, mu, alpha='kl',
         use_dual_lbfgs=False,
         solve_kwargs={'solver': cp.ECOS},
-        return_with_dual=True
+        return_with_solver_info=True
     )
 
     w2 = qpc.estimate_weights_multisample(
         x, mu, alpha='kl',
         #use_dual_lbfgs=True,
-        return_with_dual=True
+        return_with_solver_info=True
     )
 
     assert np.allclose(w['weights'], w2['weights'], atol=1e-5)
+    assert np.allclose(w['objective'], w2['objective'])
     assert np.allclose(w['dual'], w2['dual'], atol=1e-2, rtol=1e-2)
 
 
@@ -231,17 +232,18 @@ def test_maxent_dual_lbfgs_ineq():
         mom_atol=.01,
         use_dual_lbfgs=False,
         solve_kwargs={'solver': cp.ECOS},
-        return_with_dual=True
+        return_with_solver_info=True
     )
 
     w2 = qpc.estimate_weights_multisample(
         x, mu, alpha='kl',
         mom_atol=.01,
         #use_dual_lbfgs=True,
-        return_with_dual=True
+        return_with_solver_info=True
     )
 
     assert np.allclose(w['weights'], w2['weights'], atol=1e-5)
+    assert np.allclose(w['objective'], w2['objective'])
     assert np.allclose(w['dual'], w2['dual'], atol=1e-2, rtol=1e-2)
     assert np.allclose(w['dual_lower'], w2['dual_lower'], atol=1e-2, rtol=1e-2)
     assert np.allclose(w['dual_upper'], w2['dual_upper'], atol=1e-2, rtol=1e-2)

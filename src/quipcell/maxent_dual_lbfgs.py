@@ -88,6 +88,10 @@ class MaxentDualLbfgsSolver(GeneralizedDivergenceSolver):
 
         return res
 
+    def _objective(self):
+        w = self.weights(renormalize=False)
+        return jnp.sum(w * jnp.log(w), axis=0) - jnp.log(w.shape[0])
+
     def _dual_moments(self):
         vals = []
         for i in range(len(self.opt_res_list)):
