@@ -93,21 +93,21 @@ def test_dual_small_epsilon():
 
     res1 = qpc.AlphaDivergenceCvxpySolver(
         alpha=2, mom_atol=1e-8,
-        solve_kwargs={'solver': cp.OSQP}
+        solve_kwargs={'solver': cp.OSQP},
     )
     res1.fit(x, mu)
 
     res2 = qpc.AlphaDivergenceCvxpySolver(
         alpha=2,
         #mom_atol=.001, mom_rtol=.001,
-        solve_kwargs={'solver': cp.OSQP}
+        solve_kwargs={'solver': cp.OSQP},
     )
     res2.fit(x, mu)
 
-    l2 = res2.dual_moments()
-    l1 = res1.dual_moments()
+    l2 = res2._dual_moments()
+    l1 = res1._dual_moments()
 
-    assert np.allclose(l1, l2, rtol=.1, atol=.001)
+    assert np.allclose(l1['dual'], l2['dual'], rtol=.1, atol=.001)
 
     assert np.allclose(res1.dual_sum1(), res2.dual_sum1(),
                        rtol=1e-2, atol=1e-4)
@@ -201,15 +201,18 @@ def test_maxent_dual_lbfgs_eq():
     w = qpc.estimate_weights_multisample(
         x, mu, alpha='kl',
         use_dual_lbfgs=False,
-        solve_kwargs={'solver': cp.ECOS}
+        solve_kwargs={'solver': cp.ECOS},
+        return_with_dual=True
     )
 
     w2 = qpc.estimate_weights_multisample(
         x, mu, alpha='kl',
-        #use_dual_lbfgs=True
+        #use_dual_lbfgs=True,
+        return_with_dual=True
     )
 
-    assert np.allclose(w, w2, atol=1e-5)
+    assert np.allclose(w['weights'], w2['weights'], atol=1e-5)
+    assert np.allclose(w['dual'], w2['dual'], atol=1e-2, rtol=1e-2)
 
 
 def test_maxent_dual_lbfgs_ineq():
@@ -227,13 +230,18 @@ def test_maxent_dual_lbfgs_ineq():
         x, mu, alpha='kl',
         mom_atol=.01,
         use_dual_lbfgs=False,
-        solve_kwargs={'solver': cp.ECOS}
+        solve_kwargs={'solver': cp.ECOS},
+        return_with_dual=True
     )
 
     w2 = qpc.estimate_weights_multisample(
         x, mu, alpha='kl',
         mom_atol=.01,
-        #use_dual_lbfgs=True
+        #use_dual_lbfgs=True,
+        return_with_dual=True
     )
 
-    assert np.allclose(w, w2, atol=1e-5)
+    assert np.allclose(w['weights'], w2['weights'], atol=1e-5)
+    assert np.allclose(w['dual'], w2['dual'], atol=1e-2, rtol=1e-2)
+    assert np.allclose(w['dual_lower'], w2['dual_lower'], atol=1e-2, rtol=1e-2)
+    assert np.allclose(w['dual_upper'], w2['dual_upper'], atol=1e-2, rtol=1e-2)

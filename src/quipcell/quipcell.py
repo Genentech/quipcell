@@ -22,6 +22,7 @@ def estimate_weights_multisample(
         renormalize=True,
         alpha='pearson',
         use_dual_lbfgs=None,
+        return_with_dual=False,
         **kwargs
 ):
     """Estimate density weights for multiple samples on a single-cell reference.
@@ -35,8 +36,9 @@ def estimate_weights_multisample(
     :param bool renormalize: Correct for any solver inaccuracies by setting small negative numbers to 0, and renormalizing sums to 1.
     :param float alpha: Value of alpha for alpha-divergence. Also accepts 'pearson' for alpha=2 (which is a quadratic program) or 'kl' for alpha=1 (which is same as maximum entropy).
     :param bool use_dual_lbfgs: If True, solve via the dual problem with L-BFGS-B, instead of using cvxpy. Currently only implemented for alpha==1 or alpha=='kl'. Default is True when alpha==1 or 'kl', and False otherwise.
+    :param bool return_with_dual: If False, return a numpy array with the weights.  If True, return a dict with the weights and the dual solution for the moment constraints.
 
-    :rtype: :class:`numpy.ndarray`
+    :rtype: Union[dict,numpy.ndarray]
     """
 
     start = datetime.now()
@@ -52,7 +54,13 @@ def estimate_weights_multisample(
         raise NotImplementedError("Dual LBFGS solver only implemented for alpha=1")
 
     solver.fit(X, mu_multisample)
-    return solver.weights(renormalize=renormalize)
+    ret = solver.weights(renormalize=renormalize)
+    if not return_with_dual:
+        return ret
+    else:
+        ret = {'weights': ret}
+        ret.update(solver._dual_moments())
+        return ret
 
 def renormalize_weights(weights, size_factors):
     """Renormalize weights to correct for cell-specific size factors.
