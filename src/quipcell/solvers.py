@@ -33,6 +33,10 @@ class GeneralizedDivergenceSolver(object):
             ret = np.einsum("ij,j->ij", ret, 1.0 / ret.sum(axis=0))
 
         return ret
+
+    @property
+    def _equality_constraints(self):
+        return self.mom_atol == 0 and self.mom_rtol == 0
     
 
 class AlphaDivergenceCvxpySolver(GeneralizedDivergenceSolver):
@@ -88,56 +92,6 @@ class AlphaDivergenceCvxpySolver(GeneralizedDivergenceSolver):
             for prob in self.opt_res_list
         ])
 
-    def dual_moments(self, direction='both'):
-        if not self.opt_res_list:
-            raise ValueError("Need to call fit() first")
-
-        start = self._dual_n_skip_constraints
-        if self._equality_constraints:
-            vals = []
-            for i in range(len(self.opt_res_list)):
-                vals.append(self.opt_res_list[i].constraints[start].dual_value)
-            vals = np.array(vals)
-
-            if direction == 'both':
-                return vals
-            elif direction == 'upper':
-                # TODO
-                raise NotImplementedError()
-            elif direction == 'lower':
-                # TODO
-                raise NotImplementedError()
-            else:
-                raise ValueError(f"Invalid direction {direction} (typo?)")
-        else:
-            if direction == 'upper':
-                # FIXME Don't make the fact that upper is first
-                # manually hardcoded
-                return np.array([
-                    self.opt_res_list[i].constraints[start].dual_value
-                    for i in range(len(self.opt_res_list))
-                ])
-            elif direction == 'lower':
-                # FIXME Don't make the fact that lower is second
-                # manually hardcoded
-                return np.array([
-                    self.opt_res_list[i].constraints[start+1].dual_value
-                    for i in range(len(self.opt_res_list))
-                ])
-            elif direction == 'both':
-                upper = self.dual_moments(direction='upper')
-                lower = self.dual_moments(direction='lower')
-
-                # This fails to be true when atol/rtol is very small.
-                # Possibly due to numerical instability in that case?
-                #assert np.all(np.isclose(upper, 0) | np.isclose(lower, 0))
-
-                # But the difference seems to remain stable even when
-                # epsilon is very small
-                return upper - lower
-            else:
-                raise ValueError(f"Invalid direction {direction} (typo?)")
-
     # HACK Hardcoding that the first 2 constraints are the sum-to-1
     # and non-negative constraints. Assert this when constructing
     # constraints.
@@ -145,10 +99,33 @@ class AlphaDivergenceCvxpySolver(GeneralizedDivergenceSolver):
     def _dual_n_skip_constraints(self):
         return 2
 
-    @property
-    def _equality_constraints(self):
-        return self.mom_atol == 0 and self.mom_rtol == 0
-
+    def _dual_moments(self):
+        start = self._dual_n_skip_constraints
+        if self._equality_constraints:
+            vals = []
+            for i in range(len(self.opt_res_list)):
+                vals.append(self.opt_res_list[i].constraints[start].dual_value)
+            vals = np.array(vals)
+            return {'dual': vals}
+        else:
+            # FIXME Don't make the fact that upper is first
+            # manually hardcoded
+            upper = np.array([
+                self.opt_res_list[i].constraints[start].dual_value
+                for i in range(len(self.opt_res_list))
+            ])
+            # FIXME Don't make the fact that lower is second
+            # manually hardcoded
+            lower = np.array([
+                self.opt_res_list[i].constraints[start+1].dual_value
+                for i in range(len(self.opt_res_list))
+            ])
+            return {
+                'dual': upper - lower,
+                'dual_upper': upper,
+                'dual_lower': lower
+            }
+    
     def _weights1sample(self, i):
         """TODO docstring"""
         w_hat, = self.opt_res_list[i].variables()

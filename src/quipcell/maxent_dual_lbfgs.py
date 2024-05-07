@@ -87,3 +87,27 @@ class MaxentDualLbfgsSolver(GeneralizedDivergenceSolver):
         )
 
         return res
+
+    def _dual_moments(self):
+        vals = []
+        for i in range(len(self.opt_res_list)):
+            vals.append(self.opt_res_list[i]['dual_opt_res'].x)
+        vals = jnp.array(vals)
+
+        if self._equality_constraints:
+            # Note we use -X, -mu in the equality case
+            return {'dual': -vals}
+        else:
+            nvals = vals.shape[1]/2
+            assert nvals == round(nvals)
+            nvals = int(nvals)
+            # FIXME Don't make the fact that upper is the first half
+            # manually hardcoded?
+            upper = vals[:,:nvals]
+            lower = vals[:,nvals:]
+            return {
+                'dual': upper - lower,
+                'dual_upper': upper,
+                'dual_lower': lower
+            }
+    
