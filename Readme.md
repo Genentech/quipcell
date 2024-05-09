@@ -1,7 +1,6 @@
 # quipcell
 
-Quadratic program for differential abundance and bulk deconvolution
-based on Generalized Cross Entropy.
+Fine-scale cellular deconvolution based on Generalized Cross Entropy.
 
 ## Installation
 
