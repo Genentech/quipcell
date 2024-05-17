@@ -55,14 +55,14 @@ def test_dual_small_epsilon():
 
     # FIXME switch to:
     # estimate_weights_multisample(return_with_solver_info=True)
-    res1 = qpc.solvers.AlphaDivergenceCvxpySolver(
+    res1 = qpc._solvers.AlphaDivergenceCvxpySolver(
         alpha=2,
         mom_atol=1e-8,
         solve_kwargs={"solver": cp.OSQP},
     )
     res1.fit(x, mu)
 
-    res2 = qpc.solvers.AlphaDivergenceCvxpySolver(
+    res2 = qpc._solvers.AlphaDivergenceCvxpySolver(
         alpha=2,
         # mom_atol=.001, mom_rtol=.001,
         solve_kwargs={"solver": cp.OSQP},
