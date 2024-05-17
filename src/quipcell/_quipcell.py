@@ -19,13 +19,13 @@ def estimate_weights_multisample(
     alpha="pearson",
     use_dual_lbfgs=None,
     return_with_solver_info=False,
-    **kwargs
+    mom_atol=0,
+    mom_rtol=0,
+    solve_kwargs=None,
 ):
     """Estimate density weights for multiple samples on a single-cell reference.
 
     Returns a numpy array with rows=cells, columns=samples.
-
-    ``**kwargs`` are passed onto :meth:`quipcell.estimate_weights`.
 
     :param `numpy.ndarray` X: Reference embedding. Rows=cells, columns=features.
     :param `numpy.ndarray` mu_multisample: Sample moments. Either bulk gene counts
@@ -38,6 +38,15 @@ def estimate_weights_multisample(
     :param bool use_dual_lbfgs: If True, solve via the dual problem with L-BFGS-B,
         instead of using cvxpy. Currently only implemented for alpha==1 or
         alpha=='kl'. Default is True when alpha==1 or 'kl', and False otherwise.
+    :param float mom_atol: For moment constraints, require
+        X.T @ w = mu +/- eps, where
+        eps = mom_atol + abs(mu) * mom_rtol.
+    :param float mom_rtol: For moment constraints, require
+        X.T @ w = mu +/- eps, where
+        eps = mom_atol + abs(mu) * mom_rtol.
+    :param dict solve_kwargs: Additional kwargs to pass to
+        :meth:`cvxpy.Problem.solve` or :meth:`scipy.optimize.minimize` (depending
+        on ``use_dual_lbfgs``).
     :param bool return_with_solver_info: If False, return a numpy array with the
         weights.  If True, return a dict with the weights, the dual solution for
         the moment constraints, and the objective.
@@ -48,9 +57,13 @@ def estimate_weights_multisample(
         use_dual_lbfgs = alpha == 1 or alpha == "kl"
 
     if not use_dual_lbfgs:
-        solver = AlphaDivergenceCvxpySolver(alpha=alpha, **kwargs)
+        solver = AlphaDivergenceCvxpySolver(
+            alpha=alpha, mom_atol=mom_atol, mom_rtol=mom_rtol, solve_kwargs=solve_kwargs
+        )
     elif alpha == 1 or alpha == "kl":
-        solver = MaxentDualLbfgsSolver(**kwargs)
+        solver = MaxentDualLbfgsSolver(
+            mom_atol=mom_atol, mom_rtol=mom_rtol, solve_kwargs=solve_kwargs
+        )
     else:
         raise NotImplementedError("Dual LBFGS solver only implemented for alpha=1")
 
@@ -88,6 +101,9 @@ def estimate_size_factors(X, n_reads, sample, **kwargs):
     technical variation between samples.
 
     Returns a vector of the size factor for each cell.
+
+    ``**kwargs`` are additional keyword arguments passed to
+        :class:`sklearn.linear_model.PoissonRegressor`.
 
     :param `numpy.ndarray` X: Single cell embedding. Rows=cells, columns=features.
     :param `numpy.ndarray` n_reads: 1d vector of the number of reads per cell.
