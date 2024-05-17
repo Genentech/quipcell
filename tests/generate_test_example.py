@@ -1,18 +1,15 @@
 #!/usr/bin/env python
 
-import numpy as np
 import cvxpy as cp
+import numpy as np
+
 import quipcell as qpc
 
-mu1 = np.array([1,0])
-mu2 = np.array([0,1])
-sigma = .1
+mu1 = np.array([1, 0])
+mu2 = np.array([0, 1])
+sigma = 0.1
 
-mu = np.array([
-    [.75, .25],
-    [.5, .5],
-    [.1, .9]
-])
+mu = np.array([[0.75, 0.25], [0.5, 0.5], [0.1, 0.9]])
 
 assert np.allclose(mu.sum(axis=1), 1)
 
@@ -28,58 +25,50 @@ x = np.vstack([x1, x2])
 # Explicitly specify solver b/c cvxpy may change default solvers,
 # e.g. in 1.5 clarabel will become default for many problems
 
-w = qpc.estimate_weights_multisample(
-    x, mu,
-    solve_kwargs={'solver': cp.OSQP}
-)
+w = qpc.estimate_weights_multisample(x, mu, solve_kwargs={"solver": cp.OSQP})
 
 w_relax = qpc.estimate_weights_multisample(
-    x, mu, mom_atol=0.001,
-    solve_kwargs={'solver': cp.OSQP}
+    x, mu, mom_atol=0.001, solve_kwargs={"solver": cp.OSQP}
 )
 
 w_relax2 = qpc.estimate_weights_multisample(
-    x, mu, mom_rtol=0.1,
-    solve_kwargs={'solver': cp.OSQP}
+    x, mu, mom_rtol=0.1, solve_kwargs={"solver": cp.OSQP}
 )
 
 w_norm = qpc.estimate_weights_multisample(
-    x, mu, use_norm=True,
-    solve_kwargs={'solver': cp.ECOS}
+    x, mu, use_norm=True, solve_kwargs={"solver": cp.ECOS}
 )
 
-w3 = qpc.estimate_weights_multisample(
-    x, mu, alpha=3,
-    solve_kwargs={'solver': cp.ECOS}
-)
+w3 = qpc.estimate_weights_multisample(x, mu, alpha=3, solve_kwargs={"solver": cp.ECOS})
 
 w_kl = qpc.estimate_weights_multisample(
-    x, mu, alpha='kl',
-    solve_kwargs={'solver': cp.ECOS}
+    x, mu, alpha="kl", solve_kwargs={"solver": cp.ECOS}
 )
+
 
 def check_weights_reasonable(w):
     assert np.allclose(w.sum(axis=0), 1)
 
-    assert np.all(n*w[:n, 0] < .85) and np.all(n*w[:n, 0] > .65)
-    assert np.all(n*w[n:, 0] < .35) and np.all(n*w[n:, 0] > .15)
+    assert np.all(n * w[:n, 0] < 0.85) and np.all(n * w[:n, 0] > 0.65)
+    assert np.all(n * w[n:, 0] < 0.35) and np.all(n * w[n:, 0] > 0.15)
 
-    assert np.all(n*w[:,1] > .4) and np.all(n*w[:,1] < .6)
+    assert np.all(n * w[:, 1] > 0.4) and np.all(n * w[:, 1] < 0.6)
 
-    assert np.all(n*w[:n, 2] < .25) and np.all(n*w[n:, 2] > .8)
+    assert np.all(n * w[:n, 2] < 0.25) and np.all(n * w[n:, 2] > 0.8)
+
 
 check_weights_reasonable(w)
 check_weights_reasonable(w_relax)
 check_weights_reasonable(w_norm)
 
-#check_weights_reasonable(w_relax2)
-assert np.max(np.abs(w_relax2 - w)) < .01
+# check_weights_reasonable(w_relax2)
+assert np.max(np.abs(w_relax2 - w)) < 0.01
 
-#check_weights_reasonable(w3)
-assert np.max(np.abs(w3 - w)) < .01
+# check_weights_reasonable(w3)
+assert np.max(np.abs(w3 - w)) < 0.01
 
-#check_weights_reasonable(w_kl)
-assert np.max(np.abs(w_kl - w)) < .012
+# check_weights_reasonable(w_kl)
+assert np.max(np.abs(w_kl - w)) < 0.012
 
 np.savetxt("test_example_mu.txt", mu)
 np.savetxt("test_example_x.txt", x)
