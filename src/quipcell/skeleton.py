@@ -27,7 +27,7 @@ import sys
 from quipcell import __version__
 
 __author__ = "Jack Kamm"
-__copyright__ = "Jack Kamm"
+__copyright__ = "Genentech, Inc."
 __license__ = "MIT"
 
 _logger = logging.getLogger(__name__)
