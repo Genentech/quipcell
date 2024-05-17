@@ -15,7 +15,7 @@ except PackageNotFoundError:  # pragma: no cover
 finally:
     del version, PackageNotFoundError
 
-from .quipcell import (
+from ._quipcell import (
     estimate_size_factors,
     estimate_weights_multisample,
     renormalize_weights,
