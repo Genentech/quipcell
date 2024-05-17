@@ -3,21 +3,35 @@
 
 [![Built Status](https://api.cirrus-ci.com/github/<USER>/quipcell.svg?branch=main)](https://cirrus-ci.com/github/<USER>/quipcell)
 [![ReadTheDocs](https://readthedocs.org/projects/quipcell/badge/?version=latest)](https://quipcell.readthedocs.io/en/stable/)
-[![Coveralls](https://img.shields.io/coveralls/github/<USER>/quipcell/main.svg)](https://coveralls.io/r/<USER>/quipcell)
 [![PyPI-Server](https://img.shields.io/pypi/v/quipcell.svg)](https://pypi.org/project/quipcell/)
-[![Conda-Forge](https://img.shields.io/conda/vn/conda-forge/quipcell.svg)](https://anaconda.org/conda-forge/quipcell)
-[![Monthly Downloads](https://pepy.tech/badge/quipcell/month)](https://pepy.tech/project/quipcell)
-[![Twitter](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&label=Twitter)](https://twitter.com/quipcell)
 -->
 
 [![Project generated with PyScaffold](https://img.shields.io/badge/-PyScaffold-005CA0?logo=pyscaffold)](https://pyscaffold.org/)
 
 # quipcell
 
-> Add a short description here!
+> Fine-scale cellular deconvolution based on Generalized Cross Entropy
 
-A longer description of your project goes here...
+A method to perform cellular deconvolution at a fine-scale
+(i.e. single-cell or neighborhood level), using a generalization of
+maximum entropy that is also an efficient convex optimization problem.
 
+## Installation
+
+Installation
+
+```
+pip install .
+```
+
+## Tutorial
+
+See the [vignette](vignette/vignette.ipynb).
+
+## Manuscript
+
+For method details, see the
+[manuscript](***REMOVED***).
 
 <!-- pyscaffold-notes -->
 
