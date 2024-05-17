@@ -86,9 +86,16 @@ def test_example_norm():
 
     mu = np.loadtxt(os.path.join(dirname, "test_example_mu.txt"))
 
-    w2 = qpc.estimate_weights_multisample(
-        x, mu, use_norm=True, solve_kwargs={"solver": cp.ECOS}
+    # w2 = qpc.estimate_weights_multisample(
+    #    x, mu, use_norm=True, solve_kwargs={"solver": cp.ECOS}
+    # )
+    res = qpc._solvers.AlphaDivergenceCvxpySolver(
+        alpha=2,
+        use_norm=True,
+        solve_kwargs={"solver": cp.ECOS},
     )
+    res.fit(x, mu)
+    w2 = res.weights(renormalize=True)
 
     assert np.allclose(w, w2)
     # assert np.allclose(w, w2, atol=1e-6, rtol=1e-4)
