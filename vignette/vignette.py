@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # Example application of quipcell to bulk deconvolution
+# # Example application of quipcell to human lung cell atlas
 #
 # In this vignette, we demonstrate the application of `quipcell` to bulk deconvolution, replicating some analyses from the manuscript.
 #
