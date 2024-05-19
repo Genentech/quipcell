@@ -4,13 +4,15 @@
 
 ### Option 1: Downloading the preprocessed data
 
-The preprocessed data is available on ***REMOVED*** at:
+Download `quipcell_hlca_vignette_data.tar.gz` from (TODO),
+then from inside the `vignette/` folder run
+
 ```
-***REMOVED***
+tar xvf /path/to/quipcell_hlca_vignette_data.tar.gz
 ```
 
-Copy (or symlink) the contents of that folder into `data/`. Then,
-proceed to the [vignette](vignette.ipynb).
+This will create a subfolder `data/` inside the `vignette/` folder.
+Then, proceed to the [vignette](vignette.ipynb).
 
 ### Option 2: Manually preprocessing the data
 
