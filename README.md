@@ -37,7 +37,12 @@ applying quipcell to the Human Lung Cell Atlas.
 The snippet below demonstrates how to obtain weights from two
 AnnData's containing the single cell reference and the bulk samples to
 deconvolve. Both AnnDatas are assumed to contain the raw counts, and
-to have the same genes.
+to have the same genes. Dimensionality reduction steps (PCA and LDA)
+are run on the single cell reference, then applied to the bulk data,
+and then quipcell estimates single cell weights using a generalized
+maximum entropy method. The resulting weights represent the
+probability that a random read from the bulk sample originated from
+"near" the reference cell.
 
 ```{python}
 import scanpy as sc
@@ -61,31 +66,20 @@ adata_ref.obsm['X_lda'] = lda.transform(adata_ref.obsm['X_pca'])
 # Normalize the bulk samples
 sc.pp.normalize_total(adata_bulk, target_sum=normalize_sum)
 
-# Apply PCA rotation to pseudobulks
+# Apply PCA rotation to pseudobulks. Note the centers need to be
+# subtracted before rotation
 X = adata_bulk.X - np.squeeze(np.asarray(adata_ref.X.mean(axis=0)))
 X = np.asarray(X @ adata_ref.varm['PCs'])
 adata_bulk.obsm['X_pca'] = X
 # Apply LDA rotation to pseudobulks
 adata_bulk.obsm['X_lda'] = lda.transform(X)
 
-# Compute the weights. Rows are reference single cells, columns are bulk samples
+# Compute the weights. Rows are reference single cells, columns are
+# bulk samples. The entries represent the probability that a random
+# read from the bulk sample originated near the respective reference
+# cell.
 w_reads = qpc.estimate_weights_multisample(adata_ref.obsm['X_lda'],
                                          adata_bulk.obsm['X_lda'])
-
-# Optional: convert read-level probabilities (probability of sampling
-# a read from a neighborhood) to cell-level probabilities (probability
-# of sampling a cell from a neighborhood)
-
-# Estimate size factors using Poisson regression
-size_factors = qpc.estimate_size_factors(
-    adata_ref.obsm['X_lda'],
-    adata_ref.obs['n_umi'].values,
-    adata_ref.obs['sample'].values,
-    #verbose=True
-)
-
-# Convert read-level weights to cell-level weights
-w_cell = qpc.renormalize_weights(w_reads, size_factors)
 ```
 
 <!-- pyscaffold-notes -->
