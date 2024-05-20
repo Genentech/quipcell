@@ -26,8 +26,8 @@ pip install .
 
 ## Method
 
-For a description of the method, see the
-[manuscript](***REMOVED***).
+For a description of the method, see the manuscript
+(TODO: link to bioRxiv submission).
 
 ## Usage
 
