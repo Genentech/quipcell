@@ -21,7 +21,7 @@ maximum entropy that is also an efficient convex optimization problem.
 Installation
 
 ```
-pip install .
+pip install quipcell
 ```
 
 ## Method
