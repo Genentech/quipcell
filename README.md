@@ -26,8 +26,7 @@ pip install quipcell
 
 ## Method
 
-For a description of the method, see the manuscript
-(TODO: link to bioRxiv submission).
+A preprint describing the method will appear on bioRxiv shortly.
 
 ## Usage
 
