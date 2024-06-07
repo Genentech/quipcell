@@ -44,7 +44,7 @@ maximum entropy method. The resulting weights represent the
 probability that a random read from the bulk sample originated from
 "near" the reference cell.
 
-```{python}
+```
 import scanpy as sc
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
