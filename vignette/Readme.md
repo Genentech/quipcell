@@ -4,10 +4,8 @@
 
 ### Option 1: Downloading the preprocessed data
 
-Download `quipcell_hlca_vignette_data.tar.gz` from the Releases page
-(TODO: to be uploaded after open sourcing), then from inside the
-`vignette/` folder run
-
+Download [quipcell_hlca_vignette_data.tar.gz](https://github.com/Genentech/quipcell/releases/download/v0.2/quipcell_hlca_vignette_data.tar.gz),
+then from inside the `vignette/` folder run
 ```
 tar xvf /path/to/quipcell_hlca_vignette_data.tar.gz
 ```
