@@ -291,5 +291,5 @@ on [PyPI], the following steps can be used to release a new version for
 [virtual environment]: https://realpython.com/python-virtual-environments-a-primer/
 [virtualenv]: https://virtualenv.pypa.io/en/stable/
 
-[repository]: https://github.com/jackkamm/quipcell
-[issue tracker]: https://github.com/jackkamm/quipcell/issues
+[repository]: https://github.com/genentech/quipcell
+[issue tracker]: https://github.com/genentech/quipcell/issues
