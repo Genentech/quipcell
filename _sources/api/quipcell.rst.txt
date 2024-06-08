@@ -1,0 +1,10 @@
+quipcell package
+================
+
+Module contents
+---------------
+
+.. automodule:: quipcell
+   :members:
+   :undoc-members:
+   :show-inheritance:

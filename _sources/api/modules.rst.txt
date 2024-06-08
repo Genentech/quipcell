@@ -1,0 +1,7 @@
+quipcell
+========
+
+.. toctree::
+   :maxdepth: 4
+
+   quipcell
