@@ -6,14 +6,15 @@ Fine-scale cellular deconvolution based on Generalized Cross Entropy
 ## Contents
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 1
 
 Overview <readme>
+Vignette <vignette>
+Module Reference <api/modules>
 Contributions & Help <contributing>
 License <license>
 Authors <authors>
 Changelog <changelog>
-Module Reference <api/modules>
 ```
 
 ## Indices and tables
