@@ -81,3 +81,10 @@ adata_bulk.obsm['X_lda'] = lda.transform(X)
 w_reads = qpc.estimate_weights_multisample(adata_ref.obsm['X_lda'],
                                          adata_bulk.obsm['X_lda'])
 ```
+
+<!-- pyscaffold-notes -->
+
+## Note
+
+This project has been set up using PyScaffold 4.5. For details and usage
+information on PyScaffold see https://pyscaffold.org/.
