@@ -20,7 +20,7 @@
 #
 # For our dataset, we use the Human Lung Cell Atlas, which consists of several studies. We hold out one of the studies as a test set, which we use to generate (pseudo)bulk samples with known ground truth.
 #
-# To make this analysis runnable on a laptop, the data has been preprocessed into a smaller form (just the raw counts of the highly variable genes). See the [vignette readme](Readme.md) for instructions on how to download or generate the preprocessed data before running this notebook.
+# To make this analysis runnable on a laptop, the data has been preprocessed into a smaller form (just the raw counts of the highly variable genes). See the [vignette readme](https://github.com/Genentech/quipcell/blob/main/vignette/Readme.md) for instructions on how to download or generate the preprocessed data before running this notebook.
 
 # %%
 from collections import Counter

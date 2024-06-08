@@ -30,8 +30,9 @@ A preprint describing the method will appear on bioRxiv shortly.
 
 ## Usage
 
-The [vignette](vignette/vignette.ipynb) provides a detailed example
-applying quipcell to the Human Lung Cell Atlas.
+The [documentation](https://genentech.github.io/quipcell/) includes a
+[vignette](https://genentech.github.io/quipcell/vignette.html) and
+[API reference](https://genentech.github.io/quipcell/api/modules.html).
 
 The snippet below demonstrates how to obtain weights from two
 AnnData's containing the single cell reference and the bulk samples to
