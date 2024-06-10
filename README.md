@@ -26,7 +26,7 @@ pip install quipcell
 
 ## Method
 
-A preprint describing the method will appear on bioRxiv shortly.
+A preprint describing the method is available on [bioRxiv](https://www.biorxiv.org/content/10.1101/2024.06.07.598010v1).
 
 ## Usage
 
